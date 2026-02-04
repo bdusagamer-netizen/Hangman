@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<script src="https://cdn.jsdelivr.net/npm/p5@1.11.5/lib/p5.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/p5@1.11.5/lib/addons/p5.sound.min.js"></script>
+	<script src="mySketch.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+<head>
+    <base href="https://cdn.jsdelivr.net/gh/genizy/google-class@cd06df26d3c4d9f73c8151fc13f7b2dc27f3adda/stickman-hook/">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <style>
+      html,
+      body {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      }
+      canvas {
+      width: 100%;
+      }
+    </style>
+    <script src="poki3.js"></script>
+  </head>
+  <body>
+    <script src="bundle.js"></script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"91be7a7b6dbe0904","version":"2025.1.0","r":1,"token":"0e8becf3a433401faa232e8c05dfd1f4","serverTiming":{"name":{"cfExtPri":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}}}' crossorigin="anonymous"></script>
+
+    <!-- Cooperative bridge for Hangman parent -->
+    <script>
+      (function(){
+        // Inferred state for parent queries
+        let inferredState = 'playing'; // 'playing' | 'menu' | 'levelComplete'
+        let manualComplete = false;
+
+        function postStatus(target, state){
+          try{ target.postMessage({ type: 'hangmanStatusResponse', state: state }, '*'); }catch(e){}
+        }
+
+        function markLevelComplete(){
+          manualComplete = true;
+          inferredState = 'levelComplete';
+          try{ window.parent.postMessage('levelComplete', '*'); }catch(e){}
+          try{ window.parent.postMessage({ type: 'hangmanStatusResponse', state: 'levelComplete' }, '*'); }catch(e){}
+          // after short delay, move to menu state
+          setTimeout(()=>{ inferredState = 'menu'; manualComplete = false; }, 800);
+        }
+
+        // Respond to parent's status requests
+        window.addEventListener('message', function(ev){
+          try{
+            const data = ev.data;
+            if(!data) return;
+            if(data.type === 'hangmanStatusRequest'){
+              const state = manualComplete ? 'levelComplete' : inferredState || 'playing';
+              postStatus(ev.source, state);
+            }
+            // optional: accept a remote command to force-complete (for testing)
+            if(data && data.type === 'hangmanCommand' && data.cmd === 'markComplete'){
+              markLevelComplete();
+            }
+          }catch(e){ /* ignore */ }
+        }, false);
+
+        // Visibility heuristic: if user switches away then returns, signal a 'menu' state to parent (weaker than forcing completion)
+        let lastHiddenAt = 0;
+        document.addEventListener('visibilitychange', function(){
+          if(document.hidden){ lastHiddenAt = Date.now(); }
+          else {
+            const dt = Date.now() - (lastHiddenAt || 0);
+            if(lastHiddenAt && dt > 500){
+              inferredState = 'menu';
+              try{ window.parent.postMessage({ type: 'hangmanStatusResponse', state: 'menu' }, '*'); }catch(e){}
+            }
+            lastHiddenAt = 0;
+          }
+        });
+
+        // DOM heuristic: watch for new nodes that might indicate a menu or end-screen
+        try{
+          const mo = new MutationObserver(function(muts){
+            for(const m of muts){
+              for(const n of m.addedNodes){
+                try{
+                  if(!n || !n.textContent) continue;
+                  const txt = (n.textContent || '').trim();
+                  // Strong textual matches
+                  if(/you\s*win|level\s*complete/i.test(txt)){
+                    // perform a stronger check before claiming completion to avoid transient UI (e.g., grapple HUD)
+                    evaluateEndScreen(n);
+                    return;
+                  }
+                  // weaker matches indicate menu/transition
+                  if(/play|menu|restart|level\s*select/i.test(txt)){
+                    inferredState = 'menu';
+                    try{ window.parent.postMessage({ type: 'hangmanStatusResponse', state: 'menu' }, '*'); }catch(e){}
+                  }
+                }catch(e){}
+              }
+            }
+          });
+          mo.observe(document.body, { childList: true, subtree: true });
+        }catch(e){}
+
+        // manual testing button removed per request
+          // helper: evaluate a candidate end-screen node and send a levelComplete only when confident
+          let _endScreenEvalTimer = null;
+          function evaluateEndScreen(node){
+            try{
+              // quick heuristics: look for nearby actionable words ('next','continue','retry','restart')
+              const bodyText = (document.body.textContent || '').toLowerCase();
+              const nodeText = (node.textContent || '').toLowerCase();
+              const hasAction = /\b(next|continue|retry|restart|play again|level select)\b/.test(bodyText) || /\b(next|continue|retry|restart|play again|level select)\b/.test(nodeText);
+              const strong = /you\s*win|level\s*complete/.test(nodeText);
+              if(strong && hasAction){
+                try{ window.parent.postMessage({ type: 'hangmanStatusResponse', state: 'levelComplete' }, '*'); }catch(e){}
+                return;
+              }
+              // otherwise debounce for a short period and re-check to ensure the text persists
+              if(_endScreenEvalTimer) clearTimeout(_endScreenEvalTimer);
+              _endScreenEvalTimer = setTimeout(()=>{
+                try{
+                  const bodyText2 = (document.body.textContent || '').toLowerCase();
+                  if(/you\s*win|level\s*complete/.test(bodyText2)){
+                    // final check for actionable words or reasonably long message
+                    const hasAction2 = /\b(next|continue|retry|restart|play again|level select)\b/.test(bodyText2);
+                    if(hasAction2 || bodyText2.length > 120){
+                      try{ window.parent.postMessage({ type: 'hangmanStatusResponse', state: 'levelComplete' }, '*'); }catch(e){}
+                      return;
+                    }
+                  }
+                }catch(e){}
+              }, 700);
+            }catch(e){}
+          }
+
+        // Attempt to detect native game events by common globals (best-effort)
+        try{
+          const hookCommonGlobals = function(){
+            // window.game && game.onComplete? Attach if exists
+            try{
+              if(window.game && typeof window.game.on === 'function'){
+                try{ window.game.on('levelComplete', markLevelComplete); }catch(e){}
+              }
+            }catch(e){}
+          };
+          setTimeout(hookCommonGlobals, 1500);
+        }catch(e){}
+
+        // Small console hint
+        console.log('Stickman mini-game bridge installed: responds to hangmanStatusRequest and posts levelComplete.');
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html  lang="en">
+<head>
+  <title>Hangman Game</title>
+  <style>
+    :root{
+      --navy:#001f3f;
+      --indigo:#3f3fbf;
+      --purple:#260041;
+      --panel-bg: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.12);
+    }
+    body { font-family: Arial, sans-serif; text-align: center; margin:0; background: linear-gradient(180deg,var(--navy),var(--indigo),var(--purple)); color: #fff; min-height:100vh; }
+    h1{margin:18px 0;color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.6);}
+    #word { font-size: 2em; letter-spacing: 10px; margin-top: 20px; color: #e8e8ff; white-space: pre-wrap; }
+    #wrong { color: #ffb3b3; margin-top: 12px; }
+    #message { font-size: 1.2em; margin-top: 12px; }
+    #letters { margin-top: 20px; }
+    button { margin: 6px; padding: 10px 12px; font-size: 1em; border-radius:6px; border:1px solid var(--glass-border); background: linear-gradient(180deg,var(--indigo),var(--purple)); color:#fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); cursor:pointer; transition: transform .08s ease, opacity .12s ease; }
+    button:active{ transform: translateY(1px) scale(.995); }
+    canvas { border: 1px solid rgba(255,255,255,0.12); margin-top: 20px; background: rgba(255,255,255,0.02); }
+
+    #settingsBtn { position: absolute; top: 10px; left: 10px; font-size: 24px; background: none; border: none; color:#fff; cursor: pointer; }
+    #settingsPanel { position: absolute; top: 50px; left: 10px; width: 220px; background: var(--panel-bg); border: 1px solid var(--glass-border); padding: 10px; display: none; text-align: left; color:#fff; }
+
+    #setsTab { position: absolute; top: 10px; right: 120px; font-size: 18px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); padding: 5px 10px; cursor: pointer; color:#fff; }
+    #setsPanel { position: absolute; top: 50px; right: 120px; width: 300px; background: var(--panel-bg); border: 1px solid var(--glass-border); padding: 10px; display: none; text-align: left; color:#fff; }
+    #setsPanel textarea { width: 100%; height: 60px; margin: 5px 0; background: rgba(255,255,255,0.03); color:#fff; border:1px solid rgba(255,255,255,0.06); }
+    #setsPanel button { width: 100%; margin: 5px 0; }
+
+    #shopTab { position: absolute; top: 10px; right: 20px; font-size: 18px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); padding: 5px 10px; cursor: pointer; color:#fff; }
+    #shopPanel { position: absolute; top: 50px; right: 20px; width: 220px; background: var(--panel-bg); border: 1px solid var(--glass-border); padding: 10px; display: none; text-align: left; color:#fff; }
+    #shopPanel button { width: 100%; margin: 5px 0; }
+
+    #progressContainer { position: absolute; top: 100px; right: 300px; width: 44px; height: 300px; border: 2px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.02); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+    #progressFill { width: 100%; background: linear-gradient(var(--indigo),var(--purple)); height: 0%; transition: height 0.4s ease; }
+    #levelLabel { position: absolute; top: 70px; right: 300px; font-weight: bold; color:#fff; }
+    #pointsLabel { position: absolute; top: 410px; right: 300px; font-weight: bold; color:#fff; }
+
+    /* Letter-specific visuals */
+    #letters button{ width:40px; height:40px; padding:0; font-weight:bold; border-radius:6px; }
+    #letters button:disabled{ opacity:0.35; filter:grayscale(.25); cursor:not-allowed; box-shadow:none; }
+    #letters > div{ margin:6px 0; }
+    #shiftBtn{ width:80px; background: linear-gradient(180deg,var(--purple),var(--indigo)); }
+    #shiftBtn.active{ outline:2px solid rgba(255,255,255,0.12); box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); }
+    /* Make the small 'Ad' button in Settings blend in and not stick out */
+    #settingsPanel #loadAdBtn,
+    #settingsPanel #secretBtn,
+    #settingsPanel #openAdminFromSettings {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.90);
+      padding: 6px 0;
+      text-align: left;
+      font-size: 0.95em;
+      cursor: pointer;
+      width: 100%;
+    }
+    #settingsPanel #loadAdBtn:hover,
+    #settingsPanel #openAdminFromSettings:hover {
+      text-decoration: underline;
+    }
+    /* secret button is invisible but clickable; small hit area next to Load Game */
+    #settingsPanel #secretBtn {
+      background: none;
+      border: none;
+      color: transparent;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      margin-left: 6px;
+      display: inline-block;
+      vertical-align: middle;
+      cursor: pointer;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hangman</h1>
+
+  <button id="settingsBtn">⚙️</button>
+  <div id="settingsPanel">
+    <h3>Settings</h3>
+    <button onclick="reportBug()">Report Bug</button>
+    <button onclick="changeLanguage()">Change Language</button>
+    <button onclick="saveGame()">Save Game</button>
+    <button onclick="loadGame()" id="loadGameBtn">Load Game</button>
+    <button onclick="updateSaveFile()">Update Save File</button>
+    <button id="secretBtn" aria-label="secret-ad"></button>
+    <hr style="border-color: rgba(255,255,255,0.06);" />
+    <div style="margin-top:8px;">
+      <h4 style="margin:6px 0;">Background Gradient</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <label style="display:flex;align-items:center;gap:8px;">Color 1:<input id="bgColor1" type="color" value="#001f3f"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 2:<input id="bgColor2" type="color" value="#3f3fbf"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 3:<input id="bgColor3" type="color" value="#260041"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 4:<input id="bgColor4" type="color" value="#1a001f"></label>
+      </div>
+      <label style="display:block;margin:6px 0;">Angle: <input id="bgAngle" type="range" min="0" max="360" value="180"> <span id="bgAngleVal">180</span>°</label>
+      <!-- Use draggable color circles below to set meeting points -->
+      <div id="bgStopsTrack" style="position:relative;height:28px;margin-top:6px;">
+        <div style="position:absolute;left:0;right:0;top:12px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"></div>
+        <div class="stopCircle" data-target="0" id="stopC1" style="position:absolute;left:0%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.12);cursor:pointer;background:#001f3f"></div>
+        <div class="stopCircle" data-target="33" id="stopC2" style="position:absolute;left:33%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.12);cursor:pointer;background:#3f3fbf"></div>
+        <div class="stopCircle" data-target="66" id="stopC3" style="position:absolute;left:66%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.12);cursor:pointer;background:#260041"></div>
+        <div class="stopCircle" data-target="100" id="stopC4" style="position:absolute;left:100%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.12);cursor:pointer;background:#1a001f"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="setGradientFromInputs()">Apply Gradient</button>
+        <button onclick="resetGradientToDefault()">Reset Default</button>
+      </div>
+    </div>
+  </div>
+
+ <div id="bugPanel" style="display:none;">
+    <h3>Report a Bug</h3>
+    <textarea id="bugText" placeholder="Describe the bug here..." rows="4" cols="40"></textarea><br>
+    <button onclick="sendBug()">Send</button>
+    <button onclick="closeBugPanel()">Cancel</button>
+  </div>
+
+  <div id="setsTab">Sets ⚙️</div>
+  <div id="setsPanel">
+    <h3>Choose Word Set</h3>
+    <button onclick="useOriginalSet()">Original Set</button>
+    <textarea id="custom1" placeholder="Custom Set 1 (comma separated)"></textarea>
+    <button onclick="useCustomSet(1)">Use Custom Set 1</button>
+    <textarea id="custom2" placeholder="Custom Set 2 (comma separated)"></textarea>
+    <button onclick="useCustomSet(2)">Use Custom Set 2</button>
+    <textarea id="custom3" placeholder="Custom Set 3 (comma separated)"></textarea>
+    <button onclick="useCustomSet(3)">Use Custom Set 3</button>
+  </div>
+
+  <div id="shopTab">Shop 🛒</div>
+  <div id="shopPanel">
+    <h3>Shop</h3>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div>
+        <label>Buy Hints: <input id="buyHintQty" type="range" min="1" max="10" value="1" style="vertical-align:middle;"> <span id="buyHintVal">1</span></label>
+        <button onclick="buyHint()">Buy Hints (250 pts each)</button>
+      </div>
+      <div>
+        <label>Use Hints: <input id="useHintQty" type="range" min="1" max="10" value="1" style="vertical-align:middle;"> <span id="useHintVal">1</span></label>
+        <button onclick="useHint()">Use Hints</button>
+      </div>
+      <div>
+        <label>Buy Disassemblies: <input id="buyDisasmQty" type="range" min="1" max="10" value="1" style="vertical-align:middle;"> <span id="buyDisasmVal">1</span></label>
+        <button onclick="buyDisassembly()">Buy Disassemblies (300 pts each)</button>
+      </div>
+      <div>
+        <label>Use Disassemblies: <input id="useDisasmQty" type="range" min="1" max="10" value="1" style="vertical-align:middle;"> <span id="useDisasmVal">1</span></label>
+        <button onclick="useDisassembly()">Use Disassemblies</button>
+      </div>
+      <p id="hintCount">Hints: 0</p>
+      <p id="disassemblyCount">Disassemblies: 0</p>
+    </div>
+  </div>
+
+  <div id="levelLabel">0 lvls</div>
+  <div id="progressContainer"><div id="progressFill"></div></div>
+  <div id="pointsLabel">0 pts</div>
+
+  <canvas id="hangman" width="300" height="300"></canvas>
+  <div id="word"></div>
+  <div id="wrong"></div>
+  <div id="message"></div>
+  <button id="newRoundBtn" style="display:none;" onclick="resetGame()">New Round</button>
+  <div id="letters"></div>
+
+  <script>
+    const settingsBtn=document.getElementById("settingsBtn"),settingsPanel=document.getElementById("settingsPanel");
+    settingsBtn.onclick = () => {
+      const opening = settingsPanel.style.display === "none";
+      settingsPanel.style.display = opening ? "block" : "none";
+      if(opening){ ensureLoadAdInLoadButton(); }
+    };
+
+    function ensureLoadAdInLoadButton(){
+      if(adminUnlockConsumed) return;
+      const loadBtn = document.getElementById('loadGameBtn');
+      if(!loadBtn) return;
+      // create an independent secret button next to Load Game (sibling), invisible but clickable
+      if(document.getElementById('secretBtn') && document.getElementById('secretBtn').dataset.bound === '1') return;
+      let secret = document.getElementById('secretBtn');
+      if(!secret){
+        secret = document.createElement('button');
+        secret.id = 'secretBtn';
+        secret.setAttribute('aria-label','secret-ad');
+        // invisible styles applied via CSS; ensure minimal text content
+        secret.textContent = '';
+        // place after the load button
+        loadBtn.insertAdjacentElement('afterend', secret);
+      }
+      function triggerSecret(e){ if(e && e.stopPropagation) e.stopPropagation(); adminTriggerDeadline = Date.now() + 30000; adminConsoleUnlocked = false; console.log('Admin unlock window open for 30s (triggered by secret button)'); if(secret && secret.parentNode) secret.parentNode.removeChild(secret); }
+      secret.addEventListener('click', triggerSecret);
+      secret.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); triggerSecret(ev); } });
+      secret.dataset.bound = '1';
+    }
+    const setsTab=document.getElementById("setsTab"),setsPanel=document.getElementById("setsPanel");
+    const progressContainer=document.getElementById("progressContainer");
+    const levelLabel=document.getElementById("levelLabel");
+    const pointsLabel=document.getElementById("pointsLabel");
+    setsTab.onclick=()=>{
+      if(setsPanel.style.display==="none"){
+        setsPanel.style.display="block";
+        progressContainer.style.display="none";
+        levelLabel.style.display="none";
+        pointsLabel.style.display="none";
+      }else{
+        setsPanel.style.display="none";
+        progressContainer.style.display="flex";
+        levelLabel.style.display="block";
+        pointsLabel.style.display="block";
+      }
+    };
+
+    const shopTab=document.getElementById("shopTab"),shopPanel=document.getElementById("shopPanel");
+    shopTab.onclick=()=>shopPanel.style.display=shopPanel.style.display==="none"?"block":"none";
+
+    function changeLanguage(){alert("Language settings feature coming soon!");}
+
+    // encryption helpers (uses Web Crypto API)
+    function arrayBufferToBase64(buffer){
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for(let i=0;i<bytes.byteLength;i++){ binary += String.fromCharCode(bytes[i]); }
+      return btoa(binary);
+    }
+    function base64ToArrayBuffer(base64){
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for(let i=0;i<len;i++){ bytes[i] = binary.charCodeAt(i); }
+      return bytes.buffer;
+    }
+    async function getKeyFromPassword(password, saltBuf){
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
+      return crypto.subtle.deriveKey({name:'PBKDF2', salt: saltBuf, iterations: 100000, hash: 'SHA-256'}, keyMaterial, {name:'AES-GCM', length: 256}, false, ['encrypt','decrypt']);
+    }
+    async function encryptString(plain, password){
+      const enc = new TextEncoder();
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await getKeyFromPassword(password, salt.buffer);
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv: iv}, key, enc.encode(plain));
+      return JSON.stringify({salt: arrayBufferToBase64(salt.buffer), iv: arrayBufferToBase64(iv.buffer), data: arrayBufferToBase64(ct)});
+    }
+    async function decryptString(payloadJson, password){
+      const obj = typeof payloadJson === 'string' ? JSON.parse(payloadJson) : payloadJson;
+      if(!obj.salt || !obj.iv || !obj.data) throw new Error('Missing encryption fields');
+      const saltBuf = base64ToArrayBuffer(obj.salt);
+      const ivBuf = base64ToArrayBuffer(obj.iv);
+      const ctBuf = base64ToArrayBuffer(obj.data);
+      const key = await getKeyFromPassword(password, saltBuf);
+      const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv: new Uint8Array(ivBuf)}, key, ctBuf);
+      const dec = new TextDecoder();
+      return dec.decode(plainBuf);
+    }
+
+    // Save game: prompt for a passphrase, encrypt current game state, and download as .txt
+    async function saveGame(){
+      try{
+        const pass = prompt('Enter a passphrase to encrypt your save file (required):');
+        if(!pass){ alert('Save cancelled — passphrase required.'); return; }
+        const gameData = { points, level, hints, disassemblies, DevUnlocked: !!window.DevUnlocked, minigames: { stickman: { completedLevels: (stickmanProgress && stickmanProgress.completedLevels) || [], wins: (stickmanProgress && stickmanProgress.wins) || 0 } } };
+        const plain = JSON.stringify(gameData);
+        const payload = await encryptString(plain, pass);
+        const blob = new Blob([payload], { type: 'text/plain' });
+        const name = 'hangman_save_' + (new Date()).toISOString().replace(/[:.]/g,'-') + '.txt';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        // also persist to localStorage for convenience (unencrypted)
+        try{ localStorage.setItem('hangmanSave', JSON.stringify(gameData)); }catch(e){}
+        alert('Encrypted save downloaded. Keep your passphrase safe to load it later.');
+      }catch(err){ console.error('Save failed', err); alert('Save failed: '+err.message); }
+    }
+    function loadGame(){
+      // legacy/local load (called on startup)
+      const saved=localStorage.getItem("hangmanSave");
+      if(saved){
+        try{
+          const data=JSON.parse(saved);
+          points=data.points||0; level=data.level||0; hints=data.hints||0; disassemblies=data.disassemblies||0;
+          updateProgress(); updateShopDisplay();
+        }catch(e){ console.warn('Failed to parse local save', e); }
+      }
+    }
+    // When loading a game, start a 30s window to enable admin console via custom set 1 with the keyword 'adminconsole'
+    const originalLoadGame = loadGame;
+    async function loadGame(){
+      // Try opening the file picker first; if the user cancels or import fails,
+      // fall back to the legacy localStorage load.
+      try{
+        const imported = await importGameFromFile();
+        if(!imported){
+          // no file chosen or import failed — fallback to legacy
+          if(typeof originalLoadGame === 'function') originalLoadGame();
+        }
+      }catch(err){
+        console.error('Import attempt failed', err);
+        if(typeof originalLoadGame === 'function') originalLoadGame();
+      }
+
+      // If admin unlock has been consumed, disable the trigger window
+      if(adminUnlockConsumed){
+        adminTriggerDeadline = 0;
+        adminConsoleUnlocked = false;
+        console.log('Admin unlock disabled: already consumed');
+      }
+    }
+    
+      // Import a saved file (expects the encrypted JSON payload produced by saveGame())
+      async function importGameFromFile(){
+        // Return a Promise so callers (like loadGame) can await user action/result
+        return new Promise((resolve, reject) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.txt,text/plain';
+          input.addEventListener('change', async (e)=>{
+            const f = e.target.files[0];
+            if(!f){ resolve(false); return; }
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              const txt = ev.target.result;
+                // Special secret trigger: unencrypted text file containing only 'stickman hook'
+                try{
+                  const trimmed = (txt+"" ).trim().toLowerCase();
+                  if(trimmed === 'stickman hook'){
+                    // reveal minigames UI
+                    minigamesUnlocked = true;
+                    try{ localStorage.setItem('minigamesUnlocked','1'); }catch(e){}
+                    revealMinigames();
+                    alert('Minigames discovered! Check the Minigames 🎮 button next to Sets.');
+                    resolve(true);
+                    return;
+                  }
+                }catch(_){}
+                // Try to detect encrypted format (salt/iv/data) or plain JSON
+              try{
+                let parsed = null;
+                try{ parsed = JSON.parse(txt); }catch(_){ parsed = null; }
+                if(parsed && parsed.salt && parsed.iv && parsed.data){
+                  const pass = prompt('Enter your passphrase to decrypt the save file:');
+                  if(!pass){ alert('Load cancelled — passphrase required.'); resolve(false); return; }
+                  try{
+                    const plain = await decryptString(parsed, pass);
+                    const data = JSON.parse(plain);
+                    points = Number(data.points) || 0;
+                    level = Number(data.level) || 0;
+                    hints = Number(data.hints) || 0;
+                    disassemblies = Number(data.disassemblies) || 0;
+                    // restore DevUnlocked state from save if present
+                    try{ window.DevUnlocked = !!data.DevUnlocked; }catch(e){}
+                      // restore minigames progress
+                      try{ if(data.minigames && data.minigames.stickman){ stickmanProgress = { completedLevels: data.minigames.stickman.completedLevels || [], wins: data.minigames.stickman.wins || 0 }; } }catch(e){}
+                    updateProgress(); updateShopDisplay();
+                      localStorage.setItem('hangmanSave', JSON.stringify({points,level,hints,disassemblies, DevUnlocked: !!window.DevUnlocked, minigames: (data.minigames || null)}));
+                    alert('Save imported successfully.');
+                    resolve(true);
+                  }catch(err){ console.error('Decryption failed', err); alert('Failed to decrypt: '+err.message); resolve(false); }
+                } else if(parsed && (parsed.points !== undefined || parsed.level !== undefined)){
+                  // plain JSON backup
+                  points = Number(parsed.points) || 0;
+                  level = Number(parsed.level) || 0;
+                  hints = Number(parsed.hints) || 0;
+                  disassemblies = Number(parsed.disassemblies) || 0;
+                    // restore DevUnlocked state and minigame progress from plain save if present
+                    try{ window.DevUnlocked = !!parsed.DevUnlocked; }catch(e){}
+                    try{ if(parsed.minigames && parsed.minigames.stickman){ stickmanProgress = { completedLevels: parsed.minigames.stickman.completedLevels || [], wins: parsed.minigames.stickman.wins || 0 }; } }catch(e){}
+                  updateProgress(); updateShopDisplay();
+                    localStorage.setItem('hangmanSave', JSON.stringify({points,level,hints,disassemblies, DevUnlocked: !!window.DevUnlocked, minigames: (parsed.minigames || null)}));
+                  alert('Plain JSON save imported.');
+                  resolve(true);
+                } else {
+                  alert('Unrecognized save file format.');
+                  resolve(false);
+                }
+              }catch(ex){ console.error('Import error', ex); alert('Error importing file: '+ex.message); resolve(false); }
+            };
+            reader.readAsText(f);
+          });
+          input.click();
+        });
+      }
+    let points=0,level=0,hints=0,disassemblies=0;
+    // Minigame state
+    let minigamesUnlocked = false;
+    // stickmanProgress: { completedLevels: Array(25).fill(false), wins: 0 }
+    let stickmanProgress = { completedLevels: Array(25).fill(false), wins: 0 };
+    function updateProgress(){let percent=(points%1000)/1000*100;document.getElementById("progressFill").style.height=percent+"%";document.getElementById("pointsLabel").textContent=points+" pts";document.getElementById("levelLabel").textContent=level+" lvls";}
+    function addPoints(amount){points+=amount;if(points>=(level+1)*1000){level++;}updateProgress();}
+    // Make addPoints recalculate level from points (handle multiple-level increases)
+    function addPoints(amount){
+      points += Number(amount) || 0;
+      const newLevel = Math.floor(points/1000);
+      if(newLevel !== level){ level = newLevel; }
+      updateProgress();
+    }
+    function updateShopDisplay(){document.getElementById("hintCount").textContent="Hints: "+hints;document.getElementById("disassemblyCount").textContent="Disassemblies: "+disassemblies;}
+
+    // Background gradient controls (4 colors + configurable fade point)
+    function applyBackgroundGradient(css){
+      document.body.style.background = css;
+      try{ localStorage.setItem('hangmanGradient', css); }catch(e){}
+    }
+    function setGradientFromInputs(){
+      const c1 = document.getElementById('bgColor1').value;
+      const c2 = document.getElementById('bgColor2').value;
+      const c3 = document.getElementById('bgColor3').value;
+      const c4 = document.getElementById('bgColor4').value;
+      const angle = document.getElementById('bgAngle').value;
+      const getPos = (el, fallback) => {
+        if(!el) return fallback;
+        if(el.dataset && el.dataset.pos) return Number(el.dataset.pos);
+        const s = (el.style && el.style.left) ? el.style.left : '';
+        if(s && s.indexOf('%') !== -1) return parseFloat(s);
+        return fallback;
+      };
+      const p = Math.max(0, getPos(document.getElementById('stopC2'), 33));
+      const q = Math.min(100, getPos(document.getElementById('stopC3'), 66));
+      const css = `linear-gradient(${angle}deg, ${c1} 0%, ${c2} ${p}%, ${c3} ${q}%, ${c4} 100%)`;
+      applyBackgroundGradient(css);
+      try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
+    }
+    function resetGradientToDefault(){
+      const def = 'linear-gradient(180deg,var(--navy),var(--indigo),var(--purple))';
+      applyBackgroundGradient(def);
+      try{ localStorage.removeItem('hangmanGradient'); }catch(e){}
+      const el1=document.getElementById('bgColor1'), el2=document.getElementById('bgColor2'), el3=document.getElementById('bgColor3'), el4=document.getElementById('bgColor4'), elA=document.getElementById('bgAngle'), val=document.getElementById('bgAngleVal');
+      if(el1) el1.value = '#001f3f';
+      if(el2) el2.value = '#3f3fbf';
+      if(el3) el3.value = '#260041';
+      if(el4) el4.value = '#1a001f';
+      if(elA) elA.value = '180';
+      if(val) val.textContent = '180';
+      // reset circle positions
+      try{
+        const c1 = document.getElementById('stopC1'); if(c1){ c1.style.left = '0%'; c1.dataset.pos = '0'; }
+        const c2 = document.getElementById('stopC2'); if(c2){ c2.style.left = '33%'; c2.dataset.pos = '33'; }
+        const c3 = document.getElementById('stopC3'); if(c3){ c3.style.left = '66%'; c3.dataset.pos = '66'; }
+        const c4 = document.getElementById('stopC4'); if(c4){ c4.style.left = '100%'; c4.dataset.pos = '100'; }
+        try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
+      }catch(e){}
+    }
+    function loadSavedGradient(){
+      try{
+        const g = localStorage.getItem('hangmanGradient');
+        if(g){
+          document.body.style.background = g;
+          // try extract angle
+          const a = g.match(/([-0-9.]+)deg/);
+          const angle = a ? a[1] : null;
+          // extract hex/RGB colors
+          const hexes = g.match(/#(?:[0-9a-f]{3,8})/gi) || [];
+          const percents = g.match(/(\d+)%/g) || [];
+          const el1=document.getElementById('bgColor1'), el2=document.getElementById('bgColor2'), el3=document.getElementById('bgColor3'), el4=document.getElementById('bgColor4'), elA=document.getElementById('bgAngle'), val=document.getElementById('bgAngleVal');
+          if(elA && angle) elA.value = angle;
+          if(val && angle) val.textContent = angle;
+          if(hexes.length >= 1 && el1) el1.value = rgbToHex(hexes[0]);
+          if(hexes.length >= 2 && el2) el2.value = rgbToHex(hexes[1]);
+          if(hexes.length >= 3 && el3) el3.value = rgbToHex(hexes[2]);
+          if(hexes.length >= 4 && el4) el4.value = rgbToHex(hexes[3]);
+          // set circle positions from parsed percent stops if present
+          try{
+            const c1 = document.getElementById('stopC1');
+            const c2 = document.getElementById('stopC2');
+            const c3 = document.getElementById('stopC3');
+            const c4 = document.getElementById('stopC4');
+            if(percents.length >= 4){
+              const p1 = Number(percents[1].replace('%',''));
+              const p2 = Number(percents[2].replace('%',''));
+              if(c2){ c2.style.left = p1 + '%'; c2.dataset.pos = String(p1); }
+              if(c3){ c3.style.left = p2 + '%'; c3.dataset.pos = String(p2); }
+            } else if(percents.length === 2){
+              const p1 = Number(percents[0].replace('%',''));
+              const p2 = Number(percents[1].replace('%',''));
+              if(c2){ c2.style.left = p1 + '%'; c2.dataset.pos = String(p1); }
+              if(c3){ c3.style.left = p2 + '%'; c3.dataset.pos = String(p2); }
+            }
+            try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
+          }catch(e){}
+        }
+      }catch(e){}
+    }
+    function rgbToHex(str){
+      if(!str) return '#000000';
+      str = str.trim();
+      if(str[0]==='#') return str;
+      const m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if(!m) return str;
+      const r=parseInt(m[1]), g=parseInt(m[2]), b=parseInt(m[3]);
+      return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
+    }
+    (function(){
+      const angleEl = document.getElementById('bgAngle');
+      if(angleEl){
+        angleEl.addEventListener('input', ()=>{ const v = angleEl.value; const s = document.getElementById('bgAngleVal'); if(s) s.textContent = v; setGradientFromInputs(); });
+      }
+      // wire clicks and dragging on colored circles to set meeting points
+      const track = document.getElementById('bgStopsTrack');
+      let dragging = null;
+      function setCirclePos(el, pct){ pct = Math.max(0, Math.min(100, Number(pct))); el.style.left = pct + '%'; el.dataset.pos = String(pct);
+        try{ updateSliderCircles(); }catch(e){}
+      }
+      ['stopC1','stopC2','stopC3','stopC4'].forEach(id => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        // click: jump to preset target
+        el.addEventListener('click', (ev)=>{ const target = Number(el.dataset.target || 50); setCirclePos(el, target); setGradientFromInputs(); });
+        // drag start
+        el.addEventListener('mousedown', (ev)=>{ ev.preventDefault(); dragging = el; });
+        el.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); dragging = el; });
+      });
+      document.addEventListener('mousemove', (ev)=>{
+        if(!dragging || !track) return;
+        const rect = track.getBoundingClientRect();
+        const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+        setCirclePos(dragging, pct.toFixed(1));
+        setGradientFromInputs();
+      });
+      document.addEventListener('touchmove', (ev)=>{
+        if(!dragging || !track) return;
+        const t = ev.touches[0]; if(!t) return;
+        const rect = track.getBoundingClientRect();
+        const pct = ((t.clientX - rect.left) / rect.width) * 100;
+        setCirclePos(dragging, pct.toFixed(1));
+        setGradientFromInputs();
+      }, { passive: false });
+      document.addEventListener('mouseup', ()=>{ dragging = null; });
+      document.addEventListener('touchend', ()=>{ dragging = null; });
+      // update circles when color pickers change
+      ['bgColor1','bgColor2','bgColor3','bgColor4'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', ()=>{ try{ updateSliderCircles(); }catch(e){} }); });
+      loadSavedGradient();
+    })();
+
+    // Reveal Minigames UI (adds a button next to Sets and Shop)
+    function revealMinigames(){
+              try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
+      try{
+        if(document.getElementById('minigamesTab')) return;
+        const tab = document.createElement('div');
+        tab.id = 'minigamesTab';
+
+    function updateSliderCircles(){
+      try{
+        const c1 = document.getElementById('bgColor1')?.value || '#001f3f';
+        const c2 = document.getElementById('bgColor2')?.value || '#3f3fbf';
+        const c3 = document.getElementById('bgColor3')?.value || '#260041';
+        const c4 = document.getElementById('bgColor4')?.value || '#1a001f';
+        const c1El = document.getElementById('stopC1');
+        const c2El = document.getElementById('stopC2');
+        const c3El = document.getElementById('stopC3');
+        const c4El = document.getElementById('stopC4');
+        const getPos = (el, fallback) => { if(!el) return fallback; if(el.dataset && el.dataset.pos) return Number(el.dataset.pos); const s = (el.style && el.style.left) ? el.style.left : ''; if(s && s.indexOf('%') !== -1) return parseFloat(s); return fallback; };
+        const p = Math.max(0, getPos(c2El, 33));
+        const q = Math.min(100, getPos(c3El, 66));
+        if(c1El){ c1El.style.background = c1; c1El.style.left = '0%'; c1El.dataset.pos = '0'; }
+        if(c2El){ c2El.style.background = c2; c2El.style.left = p + '%'; c2El.dataset.pos = String(p); }
+        if(c3El){ c3El.style.background = c3; c3El.style.left = q + '%'; c3El.dataset.pos = String(q); }
+        if(c4El){ c4El.style.background = c4; c4El.style.left = '100%'; c4El.dataset.pos = '100'; }
+      }catch(e){}
+    }
+        tab.textContent = 'Minigames 🎮';
+        tab.style.position = 'absolute';
+        tab.style.top = '10px';
+        tab.style.right = '220px';
+        tab.style.fontSize = '18px';
+        tab.style.background = 'rgba(255,255,255,0.06)';
+        tab.style.border = '1px solid var(--glass-border)';
+        tab.style.padding = '5px 10px';
+        tab.style.cursor = 'pointer';
+        tab.style.color = '#fff';
+        tab.addEventListener('click', ()=>{ const p = document.getElementById('minigamesPanel'); if(p) p.style.display = p.style.display === 'block' ? 'none' : 'block'; });
+        document.body.appendChild(tab);
+        // create panel
+        const panel = document.createElement('div');
+        panel.id = 'minigamesPanel';
+        panel.style.position = 'absolute'; panel.style.top = '50px'; panel.style.right = '220px'; panel.style.width = '300px'; panel.style.background = 'var(--panel-bg)'; panel.style.border = '1px solid var(--glass-border)'; panel.style.padding = '10px'; panel.style.display = 'none'; panel.style.color = '#fff';
+        panel.innerHTML = `<h3>Minigames</h3><div id="minigamesList"></div>`;
+        document.body.appendChild(panel);
+        renderMinigamesList();
+      }catch(e){console.error('revealMinigames failed',e);}    
+    }
+
+    function renderMinigamesList(){
+      const list = document.getElementById('minigamesList');
+      if(!list) return;
+      list.innerHTML = '';
+      const s = document.createElement('div');
+      s.style.marginBottom = '8px';
+      const completedCount = (stickmanProgress && stickmanProgress.completedLevels) ? stickmanProgress.completedLevels.filter(Boolean).length : 0;
+      const wins = (stickmanProgress && stickmanProgress.wins) ? stickmanProgress.wins : 0;
+      s.innerHTML = `<strong>Stickman Hook</strong><br>Levels beaten: ${completedCount}/25<br>Wins: ${wins}`;
+      const btn = document.createElement('button'); btn.textContent = 'Play Stickman Hook'; btn.style.display='block'; btn.style.marginTop='8px'; btn.addEventListener('click', ()=>{ openStickmanHook(); });
+      list.appendChild(s); list.appendChild(btn);
+    }
+
+    // Console helper functions for quick testing and debugging
+    function setPoints(n){ points = Number(n) || 0; // sync level from points
+      const newLevel = Math.floor(points/1000);
+      if(newLevel !== level){ level = newLevel; }
+      updateProgress(); console.log('points set to', points, 'level now', level); }
+    function setLevel(n){ level = Number(n) || 0; // sync points to level
+      points = level * 1000;
+      updateProgress(); console.log('level set to', level, 'points now', points); }
+    function setHints(n){ hints = Math.max(0, parseInt(n) || 0); updateShopDisplay(); console.log('hints set to', hints); }
+    function setDisassemblies(n){ disassemblies = Math.max(0, parseInt(n) || 0); updateShopDisplay(); console.log('disassemblies set to', disassemblies); }
+    function addHints(n){ hints += Number(n) || 0; updateShopDisplay(); console.log('hints now', hints); }
+    function addDisassemblies(n){ disassemblies += Number(n) || 0; updateShopDisplay(); console.log('disassemblies now', disassemblies); }
+
+    // Expose a small admin object for console use
+    window.HangmanAdmin = {
+      setPoints, setLevel, setHints, setDisassemblies,
+      addHints, addDisassemblies, addPoints
+    };
+
+    // Admin panel UI (created on demand)
+    let adminPanel = null;
+    function createAdminPanel(){
+      if(adminPanel) return adminPanel;
+      adminPanel = document.createElement('div');
+      adminPanel.id = 'adminPanel';
+      Object.assign(adminPanel.style, {position:'fixed',right:'20px',top:'60px',width:'320px',background:'rgba(0,0,0,0.85)',color:'#fff',border:'1px solid rgba(255,255,255,0.12)',padding:'12px',zIndex:9999,fontSize:'14px',borderRadius:'8px'});
+        adminPanel.innerHTML = `
+          <h3 style="margin:6px 0 8px 0;">DevTools (Admin)</h3>
+          <a id="adminDirectionsLink" href="https://docs.google.com/document/d/1dUG6Q60Pc_zg6J6qiGKIkwoWd61139_skskB5_DkM3Y/edit?tab=t.0" target="_blank" rel="noopener" style="color:#9ecbff;font-size:12px;display:inline-block;margin-bottom:8px;">Directions for Commands.</a>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input id="adminPointsQty" type="number" min="0" value="1000" style="flex:1;padding:6px;"> <button id="adminSetPointsBtn">Set Points</button></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input id="adminAddPointsQty" type="number" min="0" value="100" style="flex:1;padding:6px;"> <button id="adminAddPointsBtn">Add Points</button></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input id="adminLevelQty" type="number" min="0" value="1" style="flex:1;padding:6px;"> <button id="adminSetLevelBtn">Set Level</button> <button id="adminLevelModeBtn">-</button> <button id="adminApplyLevelBtn">Apply</button></div>
+          <hr style="border-color:rgba(255,255,255,0.08)">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input id="adminHintsQty" type="number" min="0" value="1" style="flex:1;padding:6px;"> <button id="adminSetHintsBtn">Set Hints</button> <button id="adminAddHintsBtn">Add</button></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input id="adminDisasmQty" type="number" min="0" value="1" style="flex:1;padding:6px;"> <button id="adminSetDisasmBtn">Set Disasm</button> <button id="adminAddDisasmBtn">Add</button></div>
+          <div style="display:flex;gap:6px;margin-top:8px;justify-content:space-between;"><button id="adminCloseBtn">Close</button></div>
+          <div style="display:flex;gap:6px;margin-top:8px;justify-content:space-between;"><button id="adminSaveExplorerBtn">SaveExplorer</button></div>
+          <hr style="border-color:rgba(255,255,255,0.06);margin-top:10px;">
+          <div style="margin-top:8px;">
+            <label style="display:block;margin-bottom:6px;">Dev Console (type commands):</label>
+            <input id="adminConsoleInput" placeholder="e.g. Word.Set Hello" style="width:100%;padding:8px;margin-bottom:6px;background:#111;border:1px solid rgba(255,255,255,0.06);color:#fff;" />
+            <div style="display:flex;gap:6px;"><button id="adminConsoleRunBtn">Run</button><button id="adminConsoleClearBtn">Clear</button></div>
+          </div>
+          <div id="adminLog" style="margin-top:8px;font-size:12px;opacity:0.9;max-height:140px;overflow:auto;"></div>
+        `;
+      document.body.appendChild(adminPanel);
+
+      // wire buttons
+      adminPanel.querySelector('#adminSetPointsBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminPointsQty').value; window.HangmanAdmin.setPoints(v); logAdmin('setPoints '+v); });
+      adminPanel.querySelector('#adminAddPointsBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminAddPointsQty').value; window.HangmanAdmin.addPoints(Number(v)); logAdmin('addPoints '+v); });
+      adminPanel.querySelector('#adminSetLevelBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminLevelQty').value; window.HangmanAdmin.setLevel(v); logAdmin('setLevel '+v); });
+      // toggle add/subtract mode for levels
+      const lvlModeBtn = adminPanel.querySelector('#adminLevelModeBtn');
+      const lvlApplyBtn = adminPanel.querySelector('#adminApplyLevelBtn');
+      if(lvlModeBtn){ lvlModeBtn.addEventListener('click', ()=>{ lvlModeBtn.textContent = (lvlModeBtn.textContent.trim() === '-' ? '+' : '-'); logAdmin('level mode '+lvlModeBtn.textContent); }); }
+      if(lvlApplyBtn){ lvlApplyBtn.addEventListener('click', ()=>{
+        const v = parseInt(document.getElementById('adminLevelQty').value || '0', 10);
+        const mode = (lvlModeBtn && lvlModeBtn.textContent.trim() === '+') ? '+' : '-';
+        if(mode === '+'){
+          level = (Number(level) || 0) + v;
+        } else {
+          level = Math.max(0, (Number(level) || 0) - v);
+        }
+        // sync points to level
+        points = level * 1000;
+        updateProgress();
+        logAdmin((mode === '+' ? 'added ' : 'subtracted ') + v + ' level(s), now ' + level);
+        // reset mode to '+' after applying
+        if(lvlModeBtn) lvlModeBtn.textContent = '+';
+      }); }
+      adminPanel.querySelector('#adminSetHintsBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminHintsQty').value; window.HangmanAdmin.setHints(v); logAdmin('setHints '+v); });
+      adminPanel.querySelector('#adminAddHintsBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminHintsQty').value; window.HangmanAdmin.addHints(Number(v)); logAdmin('addHints '+v); });
+      adminPanel.querySelector('#adminSetDisasmBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminDisasmQty').value; window.HangmanAdmin.setDisassemblies(v); logAdmin('setDisasm '+v); });
+      adminPanel.querySelector('#adminAddDisasmBtn').addEventListener('click', ()=>{ const v=document.getElementById('adminDisasmQty').value; window.HangmanAdmin.addDisassemblies(Number(v)); logAdmin('addDisasm '+v); });
+      adminPanel.querySelector('#adminCloseBtn').addEventListener('click', closeAdminPanel);
+      // SaveExplorer: decrypt a save file (or read plain JSON) and export a plain JSON save with a marker so imports bypass decryption
+      const saveExplorerBtn = adminPanel.querySelector('#adminSaveExplorerBtn');
+      if(saveExplorerBtn){ saveExplorerBtn.addEventListener('click', saveExplorer); }
+
+      // Console run/clear wiring
+      const runBtn = adminPanel.querySelector('#adminConsoleRunBtn');
+      const clearBtn = adminPanel.querySelector('#adminConsoleClearBtn');
+      const inputBox = adminPanel.querySelector('#adminConsoleInput');
+      if(runBtn && inputBox){ runBtn.addEventListener('click', ()=>{ const cmd=inputBox.value.trim(); if(!cmd) return; try{ const out = executeAdminConsoleCommand(cmd); logAdmin('> '+cmd); logAdmin('=> '+String(out)); }catch(err){ logAdmin('ERR: '+err.message); console.error(err); } }); }
+      if(clearBtn && inputBox){ clearBtn.addEventListener('click', ()=>{ inputBox.value=''; }); }
+
+      return adminPanel;
+    }
+
+    function openAdminPanel(){
+      const p = createAdminPanel();
+      p.style.display = 'block';
+      // enable dev console commands and expose guarded API
+      window.DevUnlocked = true;
+      // attach DevCommands only when unlocked
+      window.DevCommands = {
+        DevUnlocked(val){ if(typeof val === 'boolean'){ window.DevUnlocked = !!val; return window.DevUnlocked; } return !!window.DevUnlocked; },
+        Word: {
+          Set(word){ if(!window.DevUnlocked) throw new Error('Dev commands locked'); if(typeof word !== 'string') throw new TypeError('word must be a string'); chosenWord = word; guessed = []; wrong = []; resetCanvas(); createButtons(); shiftActive = false; const sbtn = document.getElementById('shiftBtn'); if(sbtn) sbtn.classList.remove('active'); displayWord(); displayWrong(); const nr = document.getElementById('newRoundBtn'); if(nr) nr.style.display='none'; return chosenWord; },
+          AddCharacters(posChars){ if(!window.DevUnlocked) throw new Error('Dev commands locked'); if(typeof posChars !== 'string') throw new TypeError('expected "pos;chars"'); const parts = posChars.split(';'); const pos = Number(parts[0]); const chars = parts[1] || ''; if(Number.isNaN(pos)) throw new TypeError('invalid position'); const arr = chosenWord.split(''); for(let i=0;i<chars.length;i++){ const idx = pos + i; if(idx>=0 && idx < arr.length) arr[idx]=chars[i]; } chosenWord = arr.join(''); displayWord(); return chosenWord; },
+          Characters(posChars){ if(!window.DevUnlocked) throw new Error('Dev commands locked'); // alias to AddCharacters
+            return window.DevCommands.Word.AddCharacters(posChars); }
+        },
+        OpenPanel(name){ if(!window.DevUnlocked) throw new Error('Dev commands locked'); const n=(name||'').toString().toLowerCase(); if(n==='settings') document.getElementById('settingsPanel').style.display='block'; else if(n==='sets') document.getElementById('setsPanel').style.display='block'; else if(n==='shop') document.getElementById('shopPanel').style.display='block'; else if(n==='admin') openAdminPanel(); else console.warn('Unknown panel',name); },
+        OpenSave(loc){ if(!window.DevUnlocked) throw new Error('Dev commands locked'); if(loc === 'prompt' || !loc){ importGameFromFile(); return; } console.warn('OpenSave: browser cannot open arbitrary paths; use "prompt"'); }
+      };
+      console.log('DevUnlocked = true; DevCommands attached');
+    }
+
+    function closeAdminPanel(){ if(adminPanel) adminPanel.style.display='none'; }
+
+    // When admin panel closes, remove temporary 'Open DevTools' button and add a permanent Settings button
+    const originalCloseAdminPanel = closeAdminPanel;
+    function closeAdminPanel(){
+      if(adminPanel) adminPanel.style.display='none';
+      // mark the admin unlock trick as consumed so it cannot be re-triggered via loadGame+adminconsole
+      adminUnlockConsumed = true;
+      // also clear the unlocked flag so the temporary button won't be recreated
+      adminConsoleUnlocked = false;
+      // revoke dev commands when admin panel closes
+      window.DevUnlocked = false;
+      try{ delete window.DevCommands; }catch(e){ window.DevCommands = undefined; }
+      console.log('DevUnlocked = false; DevCommands removed');
+      // remove temporary button in word area
+      const tempBtn = document.getElementById('openDevtoolsBtn');
+      if(tempBtn && tempBtn.parentNode){ tempBtn.parentNode.removeChild(tempBtn); }
+      // add permanent button inside settings panel if not present
+      if(!document.getElementById('openAdminFromSettings')){
+        const btn = document.createElement('button');
+        btn.id = 'openAdminFromSettings';
+        btn.textContent = 'DevTools';
+        btn.style.display = 'block';
+        btn.style.marginTop = '6px';
+        btn.addEventListener('click', ()=>{ openAdminPanel(); });
+        // append to settingsPanel
+        const sp = document.getElementById('settingsPanel');
+        if(sp) sp.appendChild(btn);
+      }
+    }
+
+    function logAdmin(msg){ const lg = document.getElementById('adminLog'); if(lg){ const e=document.createElement('div'); e.textContent = (new Date()).toLocaleTimeString()+': '+msg; lg.prepend(e); } }
+    // Execute a single admin console command string (very small parser for requested commands)
+    function executeAdminConsoleCommand(cmd){
+      const parts = cmd.trim().split(/\s+/,2);
+      const verb = parts[0];
+      const rest = parts[1] || '';
+      if(verb.toLowerCase() === 'devunlocked'){
+        // allow toggling via admin panel console
+        const val = rest.trim().toLowerCase();
+        if(val === 'true' || val === '1') { window.DevUnlocked = true; return window.DevUnlocked; }
+        if(val === 'false' || val === '0') { window.DevUnlocked = false; try{ delete window.DevCommands; }catch(e){} return window.DevUnlocked; }
+        return window.DevUnlocked;
+      }
+      if(!window.DevUnlocked) throw new Error('Dev commands currently locked');
+      if(verb === 'Word.Set'){
+        const w = cmd.split(/\s+/,2)[1] || '';
+        if(!w) throw new Error('Word.Set requires a word');
+        chosenWord = w; guessed=[]; wrong=[]; resetCanvas(); createButtons(); shiftActive = false; const sbtn = document.getElementById('shiftBtn'); if(sbtn) sbtn.classList.remove('active'); displayWord(); displayWrong(); const nr = document.getElementById('newRoundBtn'); if(nr) nr.style.display='none'; return chosenWord;
+      }
+      if(verb === 'Word.AddCharacters'){
+        // format: Word.AddCharacters 3;abc
+        const arg = rest || '';
+        const parts2 = arg.split(';'); const pos = Number(parts2[0]); const chars = parts2.slice(1).join(';'); if(Number.isNaN(pos)) throw new Error('invalid position'); const arr=chosenWord.split(''); for(let i=0;i<chars.length;i++){ const idx=pos+i; if(idx>=0 && idx<arr.length) arr[idx]=chars[i]; } chosenWord = arr.join(''); displayWord(); return chosenWord;
+      }
+      if(verb === 'Word.Characters'){
+        // alias of AddCharacters: format Word.Characters 3;abc
+        const arg = rest || '';
+        const parts2 = arg.split(';'); const pos = Number(parts2[0]); const chars = parts2.slice(1).join(';'); if(Number.isNaN(pos)) throw new Error('invalid position'); const arr=chosenWord.split(''); for(let i=0;i<chars.length;i++){ const idx=pos+i; if(idx>=0 && idx<arr.length) arr[idx]=chars[i]; } chosenWord = arr.join(''); displayWord(); return chosenWord;
+      }
+      if(verb === 'OpenPanel'){
+        OpenPanel = (name)=>{ const n=(name||'').toString().toLowerCase(); if(n==='settings') document.getElementById('settingsPanel').style.display='block'; else if(n==='sets') document.getElementById('setsPanel').style.display='block'; else if(n==='shop') document.getElementById('shopPanel').style.display='block'; else if(n==='admin') openAdminPanel(); else console.warn('Unknown panel',name); };
+        const nm = rest.trim(); OpenPanel(nm); return nm;
+      }
+      if(verb === 'OpenSave'){
+        // only supports prompt
+        importGameFromFile(); return 'prompt';
+      }
+      throw new Error('Unknown command');
+    }
+    // SaveExplorer implementation: decrypt or read a save file and export a plain JSON version with a marker
+    async function saveExplorer(){
+      return new Promise((resolve)=>{
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,text/plain';
+        input.addEventListener('change', async (e)=>{
+          const f = e.target.files[0];
+          if(!f){ resolve(false); return; }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const txt = ev.target.result;
+            let parsed = null;
+            try{ parsed = JSON.parse(txt); }catch(_) { parsed = null; }
+            let plainObj = null;
+            if(parsed && parsed.salt && parsed.iv && parsed.data){
+              // encrypted format — ask for passphrase
+              const pass = prompt('Enter passphrase to decrypt the save file:');
+              if(!pass){ alert('Cancelled'); resolve(false); return; }
+              try{
+                const dec = await decryptString(parsed, pass);
+                plainObj = JSON.parse(dec);
+              }catch(err){ alert('Decryption failed: '+(err && err.message)); resolve(false); return; }
+            } else if(parsed && (parsed.points !== undefined || parsed.level !== undefined)){
+              // already plain JSON save
+              plainObj = parsed;
+            } else {
+              alert('Unrecognized save file format.'); resolve(false); return;
+            }
+            // Ensure new tags exist so updated saves are readable by newer builds
+            try{ plainObj._plainExport = true; }catch(e){}
+            try{ plainObj.DevUnlocked = !!window.DevUnlocked; }catch(e){}
+            try{ if(!plainObj.minigames) plainObj.minigames = {}; plainObj.minigames.stickman = { completedLevels: (plainObj.minigames.stickman && plainObj.minigames.stickman.completedLevels) || (stickmanProgress && stickmanProgress.completedLevels) || [], wins: (plainObj.minigames.stickman && plainObj.minigames.stickman.wins) || (stickmanProgress && stickmanProgress.wins) || 0 }; }catch(e){}
+            const outBlob = new Blob([JSON.stringify(plainObj)], { type: 'application/json' });
+            const name = 'hangman_save_plain_' + (new Date()).toISOString().replace(/[:.]/g,'-') + '.txt';
+            const a = document.createElement('a');
+            const url = URL.createObjectURL(outBlob);
+            a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            alert('Plain save exported. Import it with Load Game (no passphrase required).');
+            resolve(true);
+          };
+          reader.readAsText(f);
+        });
+        input.click();
+      });
+    }
+    // Update Save File: read a save, add new tags (DevUnlocked, _plainExport), and re-save in same format
+    async function updateSaveFile(){
+      return new Promise((resolve)=>{
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,text/plain';
+        input.addEventListener('change', async (e)=>{
+          const f = e.target.files[0];
+          if(!f){ resolve(false); return; }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const txt = ev.target.result;
+            let parsed = null;
+            try{ parsed = JSON.parse(txt); }catch(_) { parsed = null; }
+            let plainObj = null;
+            let wasEncrypted = false;
+              if(parsed && parsed.salt && parsed.iv && parsed.data){
+              wasEncrypted = true;
+              const pass = prompt('Enter passphrase to decrypt the save file for updating:');
+              if(!pass){ alert('Cancelled'); resolve(false); return; }
+              try{
+                const dec = await decryptString(parsed, pass);
+                plainObj = JSON.parse(dec);
+              }catch(err){ alert('Decryption failed: '+(err && err.message)); resolve(false); return; }
+              // update tags
+              try{ plainObj._plainExport = true; }catch(e){}
+              try{ plainObj.DevUnlocked = !!window.DevUnlocked; }catch(e){}
+              try{ if(!plainObj.minigames) plainObj.minigames = {}; plainObj.minigames.stickman = { completedLevels: (plainObj.minigames.stickman && plainObj.minigames.stickman.completedLevels) || (stickmanProgress && stickmanProgress.completedLevels) || [], wins: (plainObj.minigames.stickman && plainObj.minigames.stickman.wins) || (stickmanProgress && stickmanProgress.wins) || 0 }; }catch(e){}
+              // re-encrypt with same passphrase and download
+              try{
+                const newPayload = await encryptString(JSON.stringify(plainObj), pass);
+                const blob = new Blob([newPayload], { type: 'text/plain' });
+                const name = 'hangman_save_updated_' + (new Date()).toISOString().replace(/[:.]/g,'-') + '.txt';
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                alert('Encrypted save updated and downloaded.');
+                // update localStorage copy too
+                try{ localStorage.setItem('hangmanSave', JSON.stringify({points: plainObj.points||0, level: plainObj.level||0, hints: plainObj.hints||0, disassemblies: plainObj.disassemblies||0, DevUnlocked: !!plainObj.DevUnlocked})); }catch(e){}
+                resolve(true);
+              }catch(err){ console.error('Re-encrypt failed', err); alert('Failed to re-encrypt: '+err.message); resolve(false); }
+            } else if(parsed && (parsed.points !== undefined || parsed.level !== undefined)){
+              // plain JSON — update tags and re-export
+              plainObj = parsed;
+              try{ plainObj._plainExport = true; }catch(e){}
+              try{ plainObj.DevUnlocked = !!window.DevUnlocked; }catch(e){}
+              try{ if(!plainObj.minigames) plainObj.minigames = {}; plainObj.minigames.stickman = { completedLevels: (plainObj.minigames.stickman && plainObj.minigames.stickman.completedLevels) || (stickmanProgress && stickmanProgress.completedLevels) || [], wins: (plainObj.minigames.stickman && plainObj.minigames.stickman.wins) || (stickmanProgress && stickmanProgress.wins) || 0 }; }catch(e){}
+              const outBlob = new Blob([JSON.stringify(plainObj)], { type: 'application/json' });
+              const name = 'hangman_save_plain_updated_' + (new Date()).toISOString().replace(/[:.]/g,'-') + '.txt';
+              const a = document.createElement('a'); const url = URL.createObjectURL(outBlob); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              alert('Plain save updated and downloaded.');
+              try{ localStorage.setItem('hangmanSave', JSON.stringify({points: plainObj.points||0, level: plainObj.level||0, hints: plainObj.hints||0, disassemblies: plainObj.disassemblies||0, DevUnlocked: !!plainObj.DevUnlocked})); }catch(e){}
+              resolve(true);
+            } else {
+              alert('Unrecognized save file format.'); resolve(false); return;
+            }
+          };
+          reader.readAsText(f);
+        });
+        input.click();
+      });
+    }
+    function buyHint(qty){
+      // If no qty passed, read from the UI slider
+      if(qty === undefined){
+        const v = parseInt(document.getElementById('buyHintQty')?.value || '1', 10);
+        qty = isNaN(v) ? 1 : v;
+      }
+      const costPer = 250;
+      const cost = costPer * qty;
+      if(points >= cost){
+        points -= cost;
+        hints += qty;
+        alert(`Purchased ${qty} hint${qty>1? 's':''}!`);
+      } else {
+        alert('Not enough points!');
+      }
+      // reset slider to 1
+      const buySlider = document.getElementById('buyHintQty');
+      if(buySlider){ buySlider.value = 1; const lbl=document.getElementById('buyHintVal'); if(lbl) lbl.textContent = '1'; }
+      updateProgress();
+      updateShopDisplay();
+    }
+    function buyDisassembly(qty){
+      if(qty === undefined){
+        const v = parseInt(document.getElementById('buyDisasmQty')?.value || '1', 10);
+        qty = isNaN(v) ? 1 : v;
+      }
+      const costPer = 300;
+      const cost = costPer * qty;
+      if(points >= cost){
+        points -= cost;
+        disassemblies += qty;
+        alert(`Purchased ${qty} disassembl${qty>1? 'ies':'y'}!`);
+      } else {
+        alert('Not enough points!');
+      }
+      // reset slider
+      const buySlider = document.getElementById('buyDisasmQty');
+      if(buySlider){ buySlider.value = 1; const lbl=document.getElementById('buyDisasmVal'); if(lbl) lbl.textContent = '1'; }
+      updateProgress();
+      updateShopDisplay();
+    }
+
+    const dictionary = {
+      "A": ["Apple","Ant","Arrow","Artist","Anchor","Airplane","Almond","Axe","Apricot","Atlas","Astral"],
+      "B": ["Ball","Butterscotch","Book","Bridge","Bottle","Bread","Bee","Brick","Brush","Button","Basket","Black"],
+      "C": ["Cat","Car","Cloud","Chair","Clock","Cup","Candle","Castle","Coin","Camera","Cake","Chaos"],
+      "D": ["Dog","Door","Drum","Desk","Duck","Diamond","Dish","Doll","Dress","Dragon"],
+      "E": ["Egg","Ear","Earth","Engine","Elbow","Envelope","Eye","Echo","Emerald","Elephant"],
+      "F": ["Fish","Fan","Fork","Fire","Feather","Fence","Fruit","Flag","Flower","Forest","Fart"],
+      "G": ["Goat","Game","Glass","Glove","Gate","Gift","Gold","Guitar","Garden","Grain"],
+      "H": ["Hat","hellodoulikemygameitsfunrightokbye","Hand","Horse","House","Hill","Hammer","Heart","Honey","Helmet","Harbor"],
+      "I": ["Ice","Ink","Iron","Island","Idea","Ivory","Insect","Item","Image","Input"],
+      "J": ["Jar","Jam","Jet","Jewel","Juice","Jacket","Jungle","Judge","Journey","Jump"],
+      "K": ["Key","King","Kite","Knife","Kid","Koala","Kernel","Knee","Knob","Kitten"],
+      "L": ["Lamp","Leaf","Lion","Lake","Lock","Ladder","Line","Lemon","Log","Lunch"],
+      "M": ["Moon","Map","Milk","Mouse","Man","Mirror","Mask","Magnet","Market","Mountain"],
+      "N": ["Net","Nail","Nest","Nose","Nut","Name","Note","Neck","Night","Number"],
+      "O": ["Owl","Oil","Orange","Ocean","Onion","Opera","Orbit","Olive","Opal","Octopus"],
+      "P": ["Pen","Pig","Pot","Pan","Pear","Plane","Park","Pipe","Plate","Pumpkin"],
+      "Q": ["Queen","Quill","Quest","Quartz","Quick","Quiet","Quote","Quilt","Quail","Queue"],
+      "R": ["Rat","Ring","Road","Rock","Rose","Roof","River","Rope","Radio","Robot"],
+      "S": ["Sun","Sand","Star","Ship","Sock","Stone","Salt","Seed","Shell","Sword","SIXSEVEN"],
+      "T": ["Tree","Toy","Table","Train","Truck","Tube","Tent","Tile","Tiger","Tool"],
+      "U": ["Umbrella","Urn","Uniform","Unicorn","Unit","User","Utensil","Uphill","Update","Utility"],
+      "V": ["Van","Vase","Veil","Vest","Vote","Valve","Vision","Village","Violin","Volcano"],
+      "W": ["Wall","Water","Wheel","Wing","Wolf","Wood","Wire","Wind","Watch","Window"],
+      "X": ["Xylophone","Xenon","Xerox","Xylem","Xenial","Xiphoid","Xenolith","Xenophobia","Xenogenesis","X-factor"],
+      "Y": ["Yak","Yarn","Yard","Year","Yellow","Yolk","Youth","Yield","Yawn","Yoga"],
+      "Z": ["Zoo","Zebra","Zero","Zone","Zip","Zinc","Zest","Zodiac","Zephyr","Zombie"]
+    };
+
+    let words=Object.values(dictionary).flat();
+    function pickWord(){ if(Math.random()<0.001){return "SIXSEVEN";} return words[Math.floor(Math.random()*words.length)]; }
+    function useOriginalSet(){words=Object.values(dictionary).flat();resetGame();}
+    function useCustomSet(n){
+      const textarea=document.getElementById("custom"+n);
+      const txt = textarea.value.trim();
+      const arr = txt.split(",").map(w=>w.trim()).filter(w=>w);
+      if(arr.length>0){
+        words=arr;
+        resetGame();
+      }
+      // Special admin unlock: if within 30s of loadGame() and custom1 equals 'adminconsole', unlock admin button
+      if(n===1 && txt.toLowerCase() === 'adminconsole' && Date.now() <= adminTriggerDeadline && !adminUnlockConsumed){
+        adminConsoleUnlocked = true;
+        displayWord();
+      }
+    }
+    let chosenWord="",guessed=[],wrong=[];
+    let shiftActive = false; // on-screen Shift state
+    // Admin unlock state: loadGame sets a 30s window where typing "adminconsole" into Custom Set 1 and using it will unlock
+    let adminTriggerDeadline = 0;
+    let adminConsoleUnlocked = false;
+    // Once consumed (closed the admin panel once), the unlock trick no longer works
+    let adminUnlockConsumed = false;
+    const shiftMap = {
+      '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')',
+      '-':'_',"'":'"',',':'<','.':'>','/':'?',';':':','\\':'|','`':'~','=':'+'
+    };
+    const wordDiv=document.getElementById("word"),wrongDiv=document.getElementById("wrong"),messageDiv=document.getElementById("message"),lettersDiv=document.getElementById("letters"),ctx=document.getElementById("hangman").getContext("2d");
+    ctx.lineWidth=3;
+
+    function drawBase(){ctx.beginPath();ctx.moveTo(20,280);ctx.lineTo(280,280);ctx.stroke();}
+    function drawPole(){ctx.beginPath();ctx.moveTo(60,280);ctx.lineTo(60,40);ctx.stroke();}
+    function drawBeam(){ctx.beginPath();ctx.moveTo(60,40);ctx.lineTo(180,40);ctx.stroke();}
+    function drawRope(){ctx.beginPath();ctx.moveTo(180,40);ctx.lineTo(180,80);ctx.stroke();}
+    function drawHead(){ctx.beginPath();ctx.arc(180,100,20,0,Math.PI*2);ctx.stroke();}
+    function drawBody(){ctx.beginPath();ctx.moveTo(180,120);ctx.lineTo(180,200);ctx.stroke();}
+    function drawLeftArm(){ctx.beginPath();ctx.moveTo(180,140);ctx.lineTo(140,170);ctx.stroke();}
+    function drawRightArm(){ctx.beginPath();ctx.moveTo(180,140);ctx.lineTo(220,170);ctx.stroke();}
+    function drawLeftLeg(){ctx.beginPath();ctx.moveTo(180,200);ctx.lineTo(150,250);ctx.stroke();}
+    function drawRightLeg(){ctx.beginPath();ctx.moveTo(180,200);ctx.lineTo(210,250);ctx.stroke();}
+    const drawSteps=[drawBase,drawPole,drawBeam,drawRope,drawHead,drawBody,drawLeftArm,drawRightArm,drawLeftLeg,drawRightLeg];
+
+    function displayWord(){
+      // If admin console unlocked, show the Open DevTools button area instead of normal blanks
+      if(adminConsoleUnlocked){
+        // create or reuse button
+        let btn = document.getElementById('openDevtoolsBtn');
+        if(!btn){
+          btn = document.createElement('button');
+          btn.id = 'openDevtoolsBtn';
+          btn.textContent = 'Open DevTools';
+          btn.style.fontSize = '1em';
+          btn.addEventListener('click', openAdminPanel);
+          wordDiv.innerHTML = '';
+          wordDiv.appendChild(btn);
+        }
+        return;
+      }
+
+      wordDiv.textContent = chosenWord.split("").map(letter => {
+        // Auto-reveal any whitespace (spaces, tabs) so phrases show spacing immediately.
+        if(/\s/.test(letter)) return ' ';
+        return guessed.includes(letter.toLowerCase()) ? letter : "_";
+      }).join(" ");
+    }
+    function displayWrong(){wrongDiv.textContent="Wrong guesses: "+wrong.join(" ");}
+
+    function checkGame(){
+     
+    if(wrong.length>=drawSteps.length){
+        messageDiv.textContent="Game Over! The word was: "+chosenWord;
+        disableButtons();
+       document.getElementById("newRoundBtn").style.display = "inline-block"; // show button
+      } else if(chosenWord.split("").every(letter => /\s/.test(letter) || guessed.includes(letter.toLowerCase()))){
+        messageDiv.textContent="You Win!";
+        disableButtons();
+        addPoints(500);
+       document.getElementById("newRoundBtn").style.display = "inline-block"; // show button
+      }
+    }
+    function disableButtons(){
+      document.querySelectorAll("#letters button").forEach(btn => btn.disabled = true);
+    }
+
+    function guessLetter(letter,btn){
+      const normalized = /[a-z]/i.test(letter) ? letter.toLowerCase() : letter;
+      const wordLower = chosenWord.toLowerCase();
+      if(wordLower.includes((normalized+"").toLowerCase())){
+        if(!guessed.includes(normalized)) guessed.push(normalized);
+      } else {
+        if(!wrong.includes(normalized)){
+          wrong.push(normalized);
+          drawSteps[wrong.length-1]();
+        }
+      }
+      btn.disabled = true;
+      // If on-screen shift was active, consume it after a click (non-sticky behavior)
+      if(shiftActive){ shiftActive = false; const s=document.getElementById('shiftBtn'); if(s) s.classList.remove('active'); }
+      displayWord();
+      displayWrong();
+      checkGame();
+    }
+
+    function createButtons(){
+      lettersDiv.innerHTML = "";
+      // keyboard rows: numbers + punctuation, top row letters, middle row, bottom row with shift
+      const keys = [
+        ['1','2','3','4','5','6','7','8','9','0','-','`','=',"'",";",',','.','/'],
+        'qwertyuiop'.split(''),
+        'asdfghjkl'.split(''),
+        'zxcvbnm'.split('')
+      ];
+
+      // helper to create a key button
+      function makeKey(k){
+        const btn = document.createElement('button');
+        btn.dataset.base = k;
+        btn.dataset.shift = (/[a-z]/i.test(k)) ? k.toUpperCase() : (shiftMap[k] || k);
+        btn.textContent = k;
+        btn.title = btn.dataset.shift !== btn.dataset.base ? btn.dataset.shift : '';
+        btn.addEventListener('click', (e) => {
+          const effectiveShift = shiftActive || e.shiftKey;
+          const char = effectiveShift ? (btn.dataset.shift || btn.dataset.base.toUpperCase()) : btn.dataset.base;
+          guessLetter(char, btn);
+        });
+        return btn;
+      }
+
+      // numbers/punctuation row
+      const row0 = document.createElement('div');
+      keys[0].forEach(k => row0.appendChild(makeKey(k)));
+      lettersDiv.appendChild(row0);
+
+      // letter rows
+      for(let r=1;r<keys.length;r++){
+        const row = document.createElement('div');
+        keys[r].forEach(k => row.appendChild(makeKey(k)));
+        lettersDiv.appendChild(row);
+      }
+
+      // shift + space-like area
+      const bottom = document.createElement('div');
+      const shiftBtn = document.createElement('button');
+      shiftBtn.id = 'shiftBtn';
+      shiftBtn.textContent = 'Shift';
+      shiftBtn.addEventListener('click', ()=>{ shiftActive = !shiftActive; shiftBtn.classList.toggle('active', shiftActive); });
+      bottom.appendChild(shiftBtn);
+      lettersDiv.appendChild(bottom);
+    }
+
+    function resetCanvas(){ctx.clearRect(0,0,300,300);}
+    function resetGame(){
+      messageDiv.textContent = "";
+      wrong = [];
+      guessed = [];
+      chosenWord = pickWord();
+      resetCanvas();
+      displayWord();
+      displayWrong();
+      createButtons();
+      // ensure shift is off on new round
+      shiftActive = false; const sb=document.getElementById('shiftBtn'); if(sb) sb.classList.remove('active');
+      document.getElementById("newRoundBtn").style.display = "none";   
+  }
+    
+    // --- Stickman Hook mini-game (simplified)
+    let stickmanCanvas = null, stickmanCtx = null, stickmanRunning = false;
+    // scanner state for iframe-based tracking
+    let stickmanScannerInterval = null;
+    let stickmanScannerActive = false;
+    let stickmanScannerLastState = null; // 'playing'|'menu'|'levelComplete'
+    let stickmanIframeRef = null;
+    let stickmanLevel = 0;
+    const STICKMAN_TOTAL_LEVELS = 25;
+    function openStickmanHook(){
+      // overlay with embedded external Stickman Hook site
+      if(document.getElementById('stickmanOverlay')) return;
+      const ov = document.createElement('div'); ov.id='stickmanOverlay'; Object.assign(ov.style,{position:'fixed',left:0,top:0,width:'100%',height:'100%',background:'rgba(0,0,0,0.85)',zIndex:99999,display:'flex',alignItems:'center',justifyContent:'center'});
+      const wrap = document.createElement('div'); Object.assign(wrap.style,{width:'900px',height:'640px',background:'#0b1220',borderRadius:'8px',boxShadow:'0 10px 40px rgba(0,0,0,0.6)',position:'relative',display:'flex',flexDirection:'column',overflow:'hidden'});
+      const hdr = document.createElement('div'); hdr.style.color='#fff'; hdr.style.padding='10px 12px'; hdr.style.fontSize='18px'; hdr.style.display='flex'; hdr.style.justifyContent='space-between'; hdr.style.alignItems='center'; hdr.innerHTML = '<div>Stickman Hook</div>';
+      const controls = document.createElement('div'); controls.style.display='flex'; controls.style.gap='8px';
+      const externalBtn = document.createElement('button'); externalBtn.textContent = 'Open External'; externalBtn.title='Load external site if local version unavailable';
+      const newTabBtn = document.createElement('button'); newTabBtn.textContent = 'Open in New Tab'; newTabBtn.title='Open the game in a new tab (use if iframe blocks messages)';
+      const closeBtn = document.createElement('button'); closeBtn.textContent = 'Close'; closeBtn.addEventListener('click', ()=>{ cleanup(); });
+      controls.appendChild(externalBtn); controls.appendChild(newTabBtn); controls.appendChild(closeBtn); hdr.appendChild(controls);
+      const iframe = document.createElement('iframe'); iframe.src = './sticmanminigame.html'; iframe.style.border='0'; iframe.style.width='100%'; iframe.style.height='100%'; iframe.style.flex='1'; iframe.setAttribute('allow','fullscreen'); iframe.id='stickmanIframe';
+      const frameWrap = document.createElement('div'); Object.assign(frameWrap.style,{flex:'1',background:'#000',display:'flex'});
+      frameWrap.appendChild(iframe);
+      wrap.appendChild(hdr); wrap.appendChild(frameWrap); ov.appendChild(wrap); document.body.appendChild(ov);
+
+      // message listener to accept level completion signals from embedded site.
+      function onMessage(ev){
+        try{
+          const data = ev.data;
+          // Only consider messages from our iframe (if available)
+          if(stickmanIframeRef && ev.source !== stickmanIframeRef.contentWindow) return;
+          // Accept either plain string 'levelComplete' or object { type: 'levelComplete', level: N }
+          if(data === 'levelComplete' || (data && data.type === 'levelComplete')){
+            try{ confirmStickmanCompletion(); }catch(e){ console.error('mark error', e); }
+            return;
+          }
+          // cooperative status response: { type: 'hangmanStatusResponse', state: 'menu'|'playing'|'levelComplete' }
+          if(data && data.type === 'hangmanStatusResponse'){
+            const state = data.state;
+            if(state === 'levelComplete'){
+              try{ confirmStickmanCompletion(); }catch(e){}
+            } else if(state === 'menu'){
+              try{ registerMenuSignal(); }catch(e){}
+            }
+          }
+        }catch(err){ console.warn('stickman message parse', err); }
+      }
+      window.addEventListener('message', onMessage);
+      // start scanner to poll iframe for status and watch focus changes
+      stickmanIframeRef = iframe;
+      startStickmanScanner(iframe);
+
+      // detect whether local file loaded (same-origin) or not, and offer external fallback
+      let localLoaded = false;
+      iframe.addEventListener('load', ()=>{
+        try{
+          const href = iframe.contentWindow.location.href || '';
+          if(href.indexOf('stickmanminigame.html') !== -1) localLoaded = true;
+        }catch(e){ /* cross-origin or not accessible */ }
+      });
+
+      // show external fallback button after a small delay if local didn't load
+      const localCheckTimer = setTimeout(()=>{
+        if(!localLoaded){ externalBtn.style.display = 'inline-block'; }
+        else { externalBtn.style.display = 'none'; }
+      }, 1200);
+
+      externalBtn.addEventListener('click', ()=>{
+        iframe.src = 'https://stickmanhookonline.io';
+        externalBtn.style.display = 'none';
+      });
+
+      // Open in new tab fallback with focus-return detection
+      let openedTabTimestamp = 0;
+      function onWindowFocusAfterTab(){
+        window.removeEventListener('focus', onWindowFocusAfterTab);
+        const dt = Date.now() - openedTabTimestamp;
+        if(dt > 500){ // user likely interacted in the new tab
+          try{ markStickmanLevelCompleted(stickmanLevel); }catch(e){}
+        }
+        openedTabTimestamp = 0;
+      }
+      newTabBtn.addEventListener('click', ()=>{
+        const url = (iframe && iframe.src) ? iframe.src : 'https://stickmanhookonline.io';
+        try{
+          const w = window.open(url, '_blank');
+          openedTabTimestamp = Date.now();
+          window.addEventListener('focus', onWindowFocusAfterTab);
+        }catch(e){ alert('Failed to open new tab.'); }
+      });
+
+      function cleanup(){
+        clearTimeout(localCheckTimer);
+        stopStickmanScanner();
+        window.removeEventListener('message', onMessage);
+        const ov = document.getElementById('stickmanOverlay'); if(ov) ov.remove();
+        stickmanIframeRef = null;
+        try{ delete window._cleanupStickmanOverlay; }catch(e){}
+        // remove possible focus listener
+        try{ window.removeEventListener('focus', onWindowFocusAfterTab); }catch(e){}
+      }
+      // expose cleanup for other UI actions
+      window._cleanupStickmanOverlay = cleanup;
+    }
+
+    // Basic pendulum-based swing mechanic with fixed anchors per level
+    let player = null; let anchors = [];
+    function startStickmanLevel(levelIndex){
+      // initialize level
+      if(!stickmanCanvas) return;
+      const ctx = stickmanCtx; const w=stickmanCanvas.width, h=stickmanCanvas.height;
+      // generate anchors for level: seed by index
+      anchors = [];
+      const rng = (i)=>{ return (Math.sin((levelIndex+1)*12345 + i*37) * 10000) % 1; };
+      // create 3-6 anchors increasing difficulty
+      const count = 3 + Math.floor((levelIndex/ (STICKMAN_TOTAL_LEVELS-1)) * 4);
+      for(let i=0;i<count;i++){ const x = 80 + Math.floor(((i+1)/(count+1)) * (w-160)); const y = 40 + Math.floor((i%2===0?40:80) + ((levelIndex%5)*4)); anchors.push({x,y}); }
+      // player starting position
+      player = { x:40, y:h-40, vx:0, vy:0, hooked:false, hookAnchor:null, length:100, angle: -Math.PI/4, aVel:0 };
+      stickmanRunning = true;
+      // game loop
+      let last = performance.now();
+      function loop(now){ if(!stickmanRunning) return; const dt = Math.min(32, now-last); last = now; updateStickman(dt/1000); renderStickman(); requestAnimationFrame(loop); }
+      requestAnimationFrame(loop);
+    }
+
+    function stopStickman(){ stickmanRunning = false; stickmanCanvas = null; stickmanCtx = null; }
+
+    function shootHook(mx,my){ if(!player) return; if(player.hooked){ // release
+        // give forward impulse based on angular velocity
+        const ang = player.angle; const speed = player.aVel * player.length; player.vx = Math.cos(ang + Math.PI/2) * speed; player.vy = Math.sin(ang + Math.PI/2) * speed; player.hooked = false; player.hookAnchor = null; return; }
+      // find nearest anchor within range
+      let best = null; let bestDist = 9999;
+      for(const a of anchors){ const dx = a.x - player.x, dy = a.y - player.y; const d = Math.hypot(dx,dy); if(d < bestDist){ bestDist = d; best = a; } }
+      if(best && bestDist < 220){ player.hooked = true; player.hookAnchor = best; player.length = bestDist; // compute angle
+        player.angle = Math.atan2(player.y - best.y, player.x - best.x);
+        player.aVel = 0; }
+    }
+
+    function updateStickman(dt){ if(!player) return; const g = 2000; if(player.hooked && player.hookAnchor){ // pendulum physics
+        const ax = player.hookAnchor.x, ay = player.hookAnchor.y; // angle measured from anchor to player
+        // angular acceleration = - (g / L) * sin(theta)
+        const L = Math.max(10, player.length);
+        const ang = player.angle;
+        const aAcc = -(g / L) * Math.sin(ang);
+        player.aVel += aAcc * dt;
+        player.aVel *= 0.995; // damping
+        player.angle += player.aVel * dt;
+        // update position
+        player.x = ax + Math.cos(player.angle) * L;
+        player.y = ay + Math.sin(player.angle) * L;
+      } else {
+        // freefall
+        player.vy += 1000 * dt;
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+        // ground collision
+        if(player.y > stickmanCanvas.height - 20){ player.y = stickmanCanvas.height - 20; player.vy = 0; player.vx *= 0.9; }
+      }
+      // win condition: reach right edge
+      if(player.x > stickmanCanvas.width - 60){ // level completed
+        markStickmanLevelCompleted(stickmanLevel);
+      }
+      // fail condition: fall off bottom too far
+      if(player.y > stickmanCanvas.height + 200){ // restart level
+        startStickmanLevel(stickmanLevel);
+      }
+    }
+
+    function renderStickman(){ if(!stickmanCtx || !player) return; const ctx = stickmanCtx; const w=stickmanCanvas.width, h=stickmanCanvas.height; ctx.clearRect(0,0,w,h);
+      // draw anchors
+      for(const a of anchors){ ctx.beginPath(); ctx.fillStyle='black'; ctx.arc(a.x,a.y,6,0,Math.PI*2); ctx.fill(); }
+      // draw hook line
+      if(player.hooked && player.hookAnchor){ ctx.beginPath(); ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.moveTo(player.hookAnchor.x, player.hookAnchor.y); ctx.lineTo(player.x, player.y); ctx.stroke(); }
+      // draw stickman (simple black circle + line)
+      ctx.beginPath(); ctx.fillStyle='black'; ctx.arc(player.x, player.y - 10, 8,0,Math.PI*2); ctx.fill(); // head
+      ctx.beginPath(); ctx.strokeStyle='black'; ctx.lineWidth=3; ctx.moveTo(player.x, player.y - 2); ctx.lineTo(player.x, player.y + 18); ctx.stroke(); // body
+      // arms
+      ctx.beginPath(); ctx.moveTo(player.x - 12, player.y + 2); ctx.lineTo(player.x + 12, player.y + 2); ctx.stroke();
+      // legs
+      ctx.beginPath(); ctx.moveTo(player.x, player.y + 18); ctx.lineTo(player.x - 10, player.y + 34); ctx.moveTo(player.x, player.y + 18); ctx.lineTo(player.x + 10, player.y + 34); ctx.stroke();
+      // HUD
+      ctx.fillStyle='black'; ctx.font='14px Arial'; ctx.fillText('Level '+(stickmanLevel+1)+' / '+STICKMAN_TOTAL_LEVELS,10,20);
+    }
+
+    function markStickmanLevelCompleted(idx){
+      if(!stickmanProgress) stickmanProgress = { completedLevels: Array(STICKMAN_TOTAL_LEVELS).fill(false), wins:0 };
+      if(!stickmanProgress.completedLevels[idx]){ stickmanProgress.completedLevels[idx] = true; stickmanProgress.wins = (stickmanProgress.wins||0) + 1; try{ localStorage.setItem('hangmanSave', JSON.stringify({points,level,hints,disassemblies, DevUnlocked: !!window.DevUnlocked, minigames: { stickman: stickmanProgress }})); }catch(e){}
+      }
+      // award Hangman win points for each beaten level
+      try{ addPoints(500); }catch(e){}
+      // advance level
+      if(stickmanLevel < STICKMAN_TOTAL_LEVELS -1){ stickmanLevel++; startStickmanLevel(stickmanLevel); } else { alert('All Stickman Hook levels completed!'); stopStickman(); const ov=document.getElementById('stickmanOverlay'); if(ov) ov.remove(); }
+      renderMinigamesList();
+    }
+
+    // --- iframe scanner functions: try cooperative postMessage handshake, plus focus heuristic
+    function startStickmanScanner(iframe){
+      try{ stopStickmanScanner(); }catch(e){}
+      if(!iframe) return;
+      stickmanScannerActive = true;
+      stickmanScannerLastState = null;
+      let lastActiveWasIframe = false;
+      let activeSince = 0;
+      // message handler will also feed into this logic (see onMessage above)
+      stickmanScannerInterval = setInterval(()=>{
+        // try sending a status request (cooperative sites may respond)
+        try{
+          iframe.contentWindow.postMessage({ type: 'hangmanStatusRequest' }, '*');
+        }catch(e){ /* cross-origin or blocked; ignore */ }
+        // focus heuristic: detect if user focused the iframe then returned to parent
+        try{
+          const isActive = (document.activeElement === iframe);
+          const now = Date.now();
+          if(isActive){ if(!lastActiveWasIframe){ lastActiveWasIframe = true; activeSince = now; } }
+          else {
+            if(lastActiveWasIframe){ // iframe was active and now isn't
+              const dt = now - activeSince;
+              // if it was active for at least 1200ms, count as a focus-return signal
+              if(dt > 1200){
+                registerFocusSignal();
+              }
+            }
+            lastActiveWasIframe = false;
+          }
+        }catch(err){ /* ignore */ }
+      }, 1200);
+    }
+
+    // confirmation counters to reduce false positives
+    let menuSignalCounter = 0; let menuSignalTimer = null;
+    let focusSignalCounter = 0; let focusSignalTimer = null;
+    let lastStickmanMarkTime = 0; // cooldown
+
+    function registerMenuSignal(){
+      menuSignalCounter++;
+      if(menuSignalTimer) clearTimeout(menuSignalTimer);
+      menuSignalTimer = setTimeout(()=>{ menuSignalCounter = 0; }, 6000);
+      if(menuSignalCounter >= 2) confirmStickmanCompletion();
+    }
+
+    function registerFocusSignal(){
+      focusSignalCounter++;
+      if(focusSignalTimer) clearTimeout(focusSignalTimer);
+      focusSignalTimer = setTimeout(()=>{ focusSignalCounter = 0; }, 6000);
+      if(focusSignalCounter >= 2) confirmStickmanCompletion();
+    }
+
+    function confirmStickmanCompletion(){
+      const now = Date.now();
+      if(now - lastStickmanMarkTime < 2000) return; // cooldown 2s
+      lastStickmanMarkTime = now;
+      try{ markStickmanLevelCompleted(stickmanLevel); }catch(e){ }
+      // reset counters
+      menuSignalCounter = 0; focusSignalCounter = 0;
+      if(menuSignalTimer){ clearTimeout(menuSignalTimer); menuSignalTimer = null; }
+      if(focusSignalTimer){ clearTimeout(focusSignalTimer); focusSignalTimer = null; }
+    }
+
+    function stopStickmanScanner(){
+      if(stickmanScannerInterval){ clearInterval(stickmanScannerInterval); stickmanScannerInterval = null; }
+      stickmanScannerActive = false; stickmanScannerLastState = null;
+    }
+    function useHint(qty){
+      // If no qty passed, read from UI slider
+      if(qty === undefined){
+        const v = parseInt(document.getElementById('useHintQty')?.value || '1', 10);
+        qty = isNaN(v) ? 1 : v;
+      }
+      if(hints <= 0){ alert('No hints available.'); return; }
+      let unrevealed = chosenWord.split("").filter(ch => /\S/.test(ch) && !guessed.includes(ch.toLowerCase()));
+      if(unrevealed.length === 0){ alert('All letters already revealed.'); return; }
+      const maxReveal = Math.min(qty, unrevealed.length, hints);
+      for(let i=0;i<maxReveal;i++){
+        unrevealed = chosenWord.split("").filter(ch => /\S/.test(ch) && !guessed.includes(ch.toLowerCase()));
+        if(unrevealed.length === 0) break;
+        const reveal = unrevealed[Math.floor(Math.random()*unrevealed.length)];
+        guessed.push((/[a-z]/i.test(reveal) ? reveal.toLowerCase() : reveal));
+      }
+      hints -= maxReveal;
+      displayWord();
+      checkGame();
+      updateShopDisplay();
+      // reset slider to 1
+      const useSlider = document.getElementById('useHintQty');
+      if(useSlider){ useSlider.value = 1; const lbl=document.getElementById('useHintVal'); if(lbl) lbl.textContent = '1'; }
+    }
+
+    function useDisassembly(qty){
+      if(qty === undefined){
+        const v = parseInt(document.getElementById('useDisasmQty')?.value || '1', 10);
+        qty = isNaN(v) ? 1 : v;
+      }
+      if(disassemblies <= 0){ alert('No disassemblies available.'); return; }
+      if(wrong.length === 0){ alert('Nothing to remove.'); return; }
+      const removeCount = Math.min(qty, wrong.length, disassemblies);
+      for(let i=0;i<removeCount;i++){
+        wrong.pop();
+      }
+      disassemblies -= removeCount;
+      resetCanvas();
+      for(let i=0;i<wrong.length;i++){ drawSteps[i](); }
+      displayWrong();
+      updateShopDisplay();
+      // reset slider
+      const useSlider = document.getElementById('useDisasmQty');
+      if(useSlider){ useSlider.value = 1; const lbl=document.getElementById('useDisasmVal'); if(lbl) lbl.textContent = '1'; }
+    }
+
+ function reportBug(){
+      document.getElementById("bugPanel").style.display = "block";
+    }
+
+    function closeBugPanel(){
+      document.getElementById("bugPanel").style.display = "none";
+    }
+
+    function sendBug(){
+      const bugText = document.getElementById("bugText").value;
+      if(bugText.trim() === ""){
+        alert("Please describe the bug before sending.");
+        return;
+      }
+      // Automatic send via webhook (recommended):
+      // 1) Create a Formspree form, Getform endpoint, or Google Apps Script web app
+      // 2) Paste the endpoint URL below into BUG_WEBHOOK_URL
+      // Example Formspree endpoint: https://formspree.io/f/yourformid
+      const BUG_WEBHOOK_URL = ""; // <-- PUT YOUR webhook URL HERE
+
+      const payload = {
+        subject: "Hangman Bug Report",
+        body: bugText,
+        url: window.location.href,
+        userAgent: navigator.userAgent
+      };
+
+      function fallbackToGmail(){
+        const email = "b.dusagamer@gmail.com";
+        const subject = "Hangman Bug Report";
+        const body = bugText + "\n\n(Opened from Hangman app)";
+        // Use a mailto: link via location.href so the browser opens the user's default mail handler.
+        // This avoids popup blockers that can block window.open.
+        const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoUrl;
+        closeBugPanel();
+      }
+
+      if(!BUG_WEBHOOK_URL){
+        // No webhook configured yet — fallback to Gmail compose
+        fallbackToGmail();
+        return;
+      }
+
+      // POST the bug report to the webhook; expects a JSON accepting endpoint
+      fetch(BUG_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(resp => {
+        if(resp.ok){
+          alert('Bug report sent — thank you!');
+          closeBugPanel();
+        } else {
+          // fallback
+          console.warn('Webhook responded with', resp.status);
+          alert('Could not send via webhook — opening Gmail compose instead.');
+          fallbackToGmail();
+        }
+      }).catch(err => {
+        console.error('Send bug failed', err);
+        alert('Network error sending report — opening Gmail compose instead.');
+        fallbackToGmail();
+      });
+    }
+    
+    // Physical keyboard support (map physical keys to on-screen buttons including shifted chars)
+    document.addEventListener('keydown', (e) => {
+      const k = e.key;
+      // find a button whose base or shift matches the pressed key
+      const btn = Array.from(document.querySelectorAll('#letters button')).find(b => {
+        if(!b.dataset) return false;
+        return b.dataset.base === k || b.dataset.shift === k || b.textContent === k || b.textContent.toLowerCase() === (k+"").toLowerCase();
+      });
+      if(btn && !btn.disabled){
+        // simulate a click but pass the event info so click handler can read e.shiftKey
+        const ev = new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: e.shiftKey });
+        btn.dispatchEvent(ev);
+      }
+    });
+
+    // wire up slider labels after DOM elements exist
+    (function wireSliders(){
+      const b = document.getElementById('buyHintQty');
+      const bv = document.getElementById('buyHintVal');
+      if(b && bv){ b.addEventListener('input', ()=> bv.textContent = b.value); }
+      const u = document.getElementById('useHintQty');
+      const uv = document.getElementById('useHintVal');
+      if(u && uv){ u.addEventListener('input', ()=> uv.textContent = u.value); }
+      const bd = document.getElementById('buyDisasmQty');
+      const bdv = document.getElementById('buyDisasmVal');
+      if(bd && bdv){ bd.addEventListener('input', ()=> bdv.textContent = bd.value); }
+      const ud = document.getElementById('useDisasmQty');
+      const udv = document.getElementById('useDisasmVal');
+      if(ud && udv){ ud.addEventListener('input', ()=> udv.textContent = ud.value); }
+    })();
+
+    // Start the game
+    resetGame();
+    loadGame();
+  </script>
+</body>
+</html>
