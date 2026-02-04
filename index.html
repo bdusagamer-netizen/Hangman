@@ -13,6 +13,11 @@
     body { font-family: Arial, sans-serif; text-align: center; margin:0; background: linear-gradient(180deg,var(--navy),var(--indigo),var(--purple)); color: #fff; min-height:100vh; }
     /* Smooth rotation when tilt control rotates the page */
     body.tilt-rotating { transition: transform 300ms ease; transform-origin: 50% 50%; }
+    /* When rotated, fix the page to viewport and swap dimensions for 90/270deg to avoid clipping */
+    body.tilt-rotated { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: auto; transform-origin: 50% 50%; }
+    body.tilt-rotated-90 { /* swap width/height when rotated 90 or 270 */
+      width: 100vh; height: 100vw;
+    }
     h1{margin:18px 0;color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.6);}
     #word { font-size: 2em; letter-spacing: 10px; margin-top: 20px; color: #e8e8ff; white-space: pre-wrap; }
     #wrong { color: #ffb3b3; margin-top: 12px; }
@@ -98,7 +103,7 @@
         <label style="display:flex;align-items:center;gap:8px;">Color 2:<input id="bgColor2" type="color" value="#3f3fbf"> <input id="useColor2" type="checkbox" checked title="Enable color 2" style="margin-left:6px;"> </label>
         <label style="display:flex;align-items:center;gap:8px;">Color 3:<input id="bgColor3" type="color" value="#260041"> <input id="useColor3" type="checkbox" checked title="Enable color 3" style="margin-left:6px;"></label>
         <label style="display:flex;align-items:center;gap:8px;">Color 4:<input id="bgColor4" type="color" value="#1a001f"> <input id="useColor4" type="checkbox" checked title="Enable color 4" style="margin-left:6px;"></label>
-        <label style="display:flex;align-items:center;gap:8px;">Tilt Control:<input id="useTilt" type="checkbox" title="Enable device tilt to control gradient" style="margin-left:6px;"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Tilt Control:<input id="useTilt" type="checkbox" checked title="Enable device tilt to control gradient" style="margin-left:6px;"></label>
       </div>
       <label style="display:block;margin:6px 0;">Angle: <input id="bgAngle" type="range" min="0" max="360" value="180"> <span id="bgAngleVal">180</span>°</label>
       <!-- Use draggable color circles below to set meeting points -->
@@ -544,35 +549,47 @@
       const r=parseInt(m[1]), g=parseInt(m[2]), b=parseInt(m[3]);
       return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
     }
-    // Device orientation (tilt) support
+    // Device orientation (tilt) support with 90° snapping and viewport swap to avoid clipping
     let tiltListening = false;
+    let tiltRotationDeg = 0; // 0,90,180,270
+    let tiltLastGamma = null;
+    let tiltRotateCooldown = 0;
+    function applyTiltRotation(deg){
+      deg = ((deg % 360) + 360) % 360;
+      tiltRotationDeg = deg;
+      document.body.classList.add('tilt-rotating');
+      // set transform
+      document.body.style.transform = deg ? `rotate(${deg}deg)` : '';
+      // set classes for swapped dimensions when 90 or 270
+      document.body.classList.toggle('tilt-rotated', deg !== 0);
+      document.body.classList.toggle('tilt-rotated-90', (deg % 180) !== 0);
+      setTimeout(()=>{ try{ document.body.classList.remove('tilt-rotating'); }catch(e){} }, 350);
+    }
     function handleDeviceOrientation(ev){
       try{
-        // gamma: left-to-right tilt (-90..90), map to 0..360 degrees
         const g = typeof ev.gamma === 'number' ? ev.gamma : 0;
-        const angle = Math.round(((g + 90) / 180) * 360) % 360;
-        const angleEl = document.getElementById('bgAngle');
-        const angleVal = document.getElementById('bgAngleVal');
-        if(angleEl){ angleEl.value = String(angle); if(angleVal) angleVal.textContent = String(angle); setGradientFromInputs(); }
-        // rotate entire page when device tilted strongly left/right
-        try{
-          const threshold = 30; // degrees of gamma to trigger rotation
-          let rot = 0;
-          if(g > threshold) rot = 90;
-          else if(g < -threshold) rot = -90;
-          if(typeof handleDeviceOrientation.lastRot === 'undefined') handleDeviceOrientation.lastRot = 0;
-          if(rot !== handleDeviceOrientation.lastRot){
-            handleDeviceOrientation.lastRot = rot;
-            document.body.classList.add('tilt-rotating');
-            document.body.style.transform = rot ? `rotate(${rot}deg)` : '';
-            // remove class after transition completes
-            setTimeout(()=>{ try{ document.body.classList.remove('tilt-rotating'); }catch(e){} }, 350);
+        // detect tilt gestures (left/right) and snap rotation by 90deg increments
+        const now = Date.now();
+        if(tiltLastGamma === null) { tiltLastGamma = g; return; }
+        const delta = g - tiltLastGamma;
+        const threshold = 30; // degrees change to consider a swipe-like tilt
+        if(now - tiltRotateCooldown > 600){
+          if(delta > threshold){
+            // tilt right -> rotate +90
+            applyTiltRotation((tiltRotationDeg + 90) % 360);
+            tiltRotateCooldown = now;
+          } else if(delta < -threshold){
+            // tilt left -> rotate -90
+            applyTiltRotation((tiltRotationDeg + 270) % 360);
+            tiltRotateCooldown = now;
           }
-        }catch(e){}
+        }
+        tiltLastGamma = g;
       }catch(e){}
     }
     async function enableTiltTrue(){
       if(tiltListening) return;
+      tiltLastGamma = null; tiltRotateCooldown = 0;
       // iOS 13+ permission flow
       try{
         if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
@@ -589,6 +606,33 @@
       if(!tiltListening) return;
       window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
       tiltListening = false;
+      // reset rotation
+      applyTiltRotation(0);
+      tiltLastGamma = null;
+    }
+    // Sync page rotation with the device/screen orientation (90° steps)
+    function getScreenOrientationAngle(){
+      try{
+        if(window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') return Number(window.screen.orientation.angle);
+        if(typeof window.orientation === 'number') return Number(window.orientation);
+        // Fallback: infer from viewport dimensions (best-effort)
+        return (window.innerWidth > window.innerHeight) ? 90 : 0;
+      }catch(e){ return 0; }
+    }
+    function syncRotationToScreenOrientation(){
+      try{
+        const useTilt = !!document.getElementById('useTilt')?.checked;
+        if(!useTilt) return;
+        const a = getScreenOrientationAngle();
+        // Normalize to nearest 90-degree step
+        const step = Math.round(a / 90) * 90;
+        applyTiltRotation(step);
+      }catch(e){}
+    }
+    // Listen for orientation changes and sync (only applies when tilt control enabled)
+    window.addEventListener('orientationchange', ()=>{ try{ syncRotationToScreenOrientation(); }catch(e){} });
+    if(window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function'){
+      try{ window.screen.orientation.addEventListener('change', ()=>{ try{ syncRotationToScreenOrientation(); }catch(e){} }); }catch(e){}
     }
     (function(){
       const angleEl = document.getElementById('bgAngle');
@@ -632,8 +676,13 @@
       // wire enable toggles for colors 2-4 and tilt
       ['useColor2','useColor3','useColor4'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', ()=>{ try{ updateSliderCircles(); setGradientFromInputs(); }catch(e){} }); });
       const tiltChk = document.getElementById('useTilt');
-      if(tiltChk){ tiltChk.addEventListener('change', async ()=>{ try{ if(tiltChk.checked) await enableTiltTrue(); else enableTiltFalse(); setGradientFromInputs(); }catch(e){} }); }
+      if(tiltChk){ tiltChk.addEventListener('change', async ()=>{ try{ if(tiltChk.checked) await enableTiltTrue(); else enableTiltFalse(); }catch(e){} }); }
       loadSavedGradient();
+      // Auto-enable tilt if checkbox is present and checked (default on)
+      try{
+        const chk = document.getElementById('useTilt');
+        if(chk && chk.checked){ enableTiltTrue().catch(()=>{}); }
+      }catch(e){}
     })();
 
     // Reveal Minigames UI (adds a button next to Sets and Shop)
