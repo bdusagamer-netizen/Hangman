@@ -93,9 +93,10 @@
       <h4 style="margin:6px 0;">Background Gradient</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
         <label style="display:flex;align-items:center;gap:8px;">Color 1:<input id="bgColor1" type="color" value="#001f3f"></label>
-        <label style="display:flex;align-items:center;gap:8px;">Color 2:<input id="bgColor2" type="color" value="#3f3fbf"></label>
-        <label style="display:flex;align-items:center;gap:8px;">Color 3:<input id="bgColor3" type="color" value="#260041"></label>
-        <label style="display:flex;align-items:center;gap:8px;">Color 4:<input id="bgColor4" type="color" value="#1a001f"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 2:<input id="bgColor2" type="color" value="#3f3fbf"> <input id="useColor2" type="checkbox" checked title="Enable color 2" style="margin-left:6px;"> </label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 3:<input id="bgColor3" type="color" value="#260041"> <input id="useColor3" type="checkbox" checked title="Enable color 3" style="margin-left:6px;"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Color 4:<input id="bgColor4" type="color" value="#1a001f"> <input id="useColor4" type="checkbox" checked title="Enable color 4" style="margin-left:6px;"></label>
+        <label style="display:flex;align-items:center;gap:8px;">Tilt Control:<input id="useTilt" type="checkbox" title="Enable device tilt to control gradient" style="margin-left:6px;"></label>
       </div>
       <label style="display:block;margin:6px 0;">Angle: <input id="bgAngle" type="range" min="0" max="360" value="180"> <span id="bgAngleVal">180</span>°</label>
       <!-- Use draggable color circles below to set meeting points -->
@@ -412,6 +413,9 @@
       const c2 = document.getElementById('bgColor2').value;
       const c3 = document.getElementById('bgColor3').value;
       const c4 = document.getElementById('bgColor4').value;
+      const use2 = !!document.getElementById('useColor2')?.checked;
+      const use3 = !!document.getElementById('useColor3')?.checked;
+      const use4 = !!document.getElementById('useColor4')?.checked;
       const angle = document.getElementById('bgAngle').value;
       const getPos = (el, fallback) => {
         if(!el) return fallback;
@@ -420,10 +424,26 @@
         if(s && s.indexOf('%') !== -1) return parseFloat(s);
         return fallback;
       };
-      const p = Math.max(0, getPos(document.getElementById('stopC2'), 33));
-      const q = Math.min(100, getPos(document.getElementById('stopC3'), 66));
-      const css = `linear-gradient(${angle}deg, ${c1} 0%, ${c2} ${p}%, ${c3} ${q}%, ${c4} 100%)`;
+      const stops = [];
+      stops.push({ color: c1, pos: 0 });
+      if(use2){ const p = Math.max(0, Math.min(100, getPos(document.getElementById('stopC2'), 25))); stops.push({ color: c2, pos: p }); }
+      if(use3){ const p = Math.max(0, Math.min(100, getPos(document.getElementById('stopC3'), 75))); stops.push({ color: c3, pos: p }); }
+      if(use4){ stops.push({ color: c4, pos: 100 }); }
+      // sort by position
+      stops.sort((a,b)=>a.pos - b.pos);
+      let css = '';
+      if(stops.length === 1){ css = stops[0].color; }
+      else {
+        const parts = stops.map(s => `${s.color} ${s.pos}%`);
+        css = `linear-gradient(${angle}deg, ${parts.join(', ')})`;
+      }
       applyBackgroundGradient(css);
+      // persist a structured config for restore (including tilt flag)
+      try{
+        const useTilt = !!document.getElementById('useTilt')?.checked;
+        const cfg = { angle: angle, colors: { c1,c2,c3,c4 }, use: { use2,use3,use4, useTilt }, positions: { c2: getPos(document.getElementById('stopC2'),25), c3: getPos(document.getElementById('stopC3'),75) } };
+        localStorage.setItem('hangmanGradientConfig', JSON.stringify(cfg));
+      }catch(e){}
       try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
     }
     function resetGradientToDefault(){
@@ -448,6 +468,34 @@
     }
     function loadSavedGradient(){
       try{
+        // Prefer structured config
+        const cfgText = localStorage.getItem('hangmanGradientConfig');
+        const cfg = cfgText ? JSON.parse(cfgText) : null;
+        if(cfg){
+          try{
+            const el1=document.getElementById('bgColor1'), el2=document.getElementById('bgColor2'), el3=document.getElementById('bgColor3'), el4=document.getElementById('bgColor4'), elA=document.getElementById('bgAngle');
+            if(el1) el1.value = cfg.colors.c1 || '#001f3f';
+            if(el2) el2.value = cfg.colors.c2 || '#3f3fbf';
+            if(el3) el3.value = cfg.colors.c3 || '#260041';
+            if(el4) el4.value = cfg.colors.c4 || '#1a001f';
+            if(elA && cfg.angle) elA.value = cfg.angle;
+            // restore use flags
+            if(document.getElementById('useColor2')) document.getElementById('useColor2').checked = !!cfg.use.use2;
+            if(document.getElementById('useColor3')) document.getElementById('useColor3').checked = !!cfg.use.use3;
+            if(document.getElementById('useColor4')) document.getElementById('useColor4').checked = !!cfg.use.use4;
+            if(document.getElementById('useTilt')) document.getElementById('useTilt').checked = !!(cfg.use && cfg.use.useTilt);
+            // restore circle positions
+            const c2 = document.getElementById('stopC2'); if(c2 && cfg.positions && cfg.positions.c2 !== undefined) { c2.style.left = String(cfg.positions.c2) + '%'; c2.dataset.pos = String(cfg.positions.c2); }
+            const c3 = document.getElementById('stopC3'); if(c3 && cfg.positions && cfg.positions.c3 !== undefined) { c3.style.left = String(cfg.positions.c3) + '%'; c3.dataset.pos = String(cfg.positions.c3); }
+            // apply gradient built from config
+            try{ setGradientFromInputs(); }catch(e){}
+            try{ if(typeof updateSliderCircles === 'function') updateSliderCircles(); }catch(e){}
+            // enable tilt if requested
+            try{ if(document.getElementById('useTilt')?.checked) { enableTiltTrue(); } }catch(e){}
+            return;
+          }catch(e){}
+        }
+        // fallback: try to import raw CSS value
         const g = localStorage.getItem('hangmanGradient');
         if(g){
           document.body.style.background = g;
@@ -457,9 +505,8 @@
           // extract hex/RGB colors
           const hexes = g.match(/#(?:[0-9a-f]{3,8})/gi) || [];
           const percents = g.match(/(\d+)%/g) || [];
-          const el1=document.getElementById('bgColor1'), el2=document.getElementById('bgColor2'), el3=document.getElementById('bgColor3'), el4=document.getElementById('bgColor4'), elA=document.getElementById('bgAngle'), val=document.getElementById('bgAngleVal');
+          const el1=document.getElementById('bgColor1'), el2=document.getElementById('bgColor2'), el3=document.getElementById('bgColor3'), el4=document.getElementById('bgColor4'), elA=document.getElementById('bgAngle');
           if(elA && angle) elA.value = angle;
-          if(val && angle) val.textContent = angle;
           if(hexes.length >= 1 && el1) el1.value = rgbToHex(hexes[0]);
           if(hexes.length >= 2 && el2) el2.value = rgbToHex(hexes[1]);
           if(hexes.length >= 3 && el3) el3.value = rgbToHex(hexes[2]);
@@ -494,6 +541,37 @@
       if(!m) return str;
       const r=parseInt(m[1]), g=parseInt(m[2]), b=parseInt(m[3]);
       return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
+    }
+    // Device orientation (tilt) support
+    let tiltListening = false;
+    function handleDeviceOrientation(ev){
+      try{
+        // gamma: left-to-right tilt (-90..90), map to 0..360 degrees
+        const g = typeof ev.gamma === 'number' ? ev.gamma : 0;
+        const angle = Math.round(((g + 90) / 180) * 360) % 360;
+        const angleEl = document.getElementById('bgAngle');
+        const angleVal = document.getElementById('bgAngleVal');
+        if(angleEl){ angleEl.value = String(angle); if(angleVal) angleVal.textContent = String(angle); setGradientFromInputs(); }
+      }catch(e){}
+    }
+    async function enableTiltTrue(){
+      if(tiltListening) return;
+      // iOS 13+ permission flow
+      try{
+        if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+          try{
+            const perm = await DeviceOrientationEvent.requestPermission();
+            if(perm !== 'granted'){ alert('Permission for device motion not granted.'); document.getElementById('useTilt').checked = false; return; }
+          }catch(e){ alert('Device motion permission denied.'); document.getElementById('useTilt').checked = false; return; }
+        }
+      }catch(e){}
+      window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+      tiltListening = true;
+    }
+    function enableTiltFalse(){
+      if(!tiltListening) return;
+      window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
+      tiltListening = false;
     }
     (function(){
       const angleEl = document.getElementById('bgAngle');
@@ -533,7 +611,11 @@
       document.addEventListener('mouseup', ()=>{ dragging = null; });
       document.addEventListener('touchend', ()=>{ dragging = null; });
       // update circles when color pickers change
-      ['bgColor1','bgColor2','bgColor3','bgColor4'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', ()=>{ try{ updateSliderCircles(); }catch(e){} }); });
+      ['bgColor1','bgColor2','bgColor3','bgColor4'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', ()=>{ try{ updateSliderCircles(); setGradientFromInputs(); }catch(e){} }); });
+      // wire enable toggles for colors 2-4 and tilt
+      ['useColor2','useColor3','useColor4'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', ()=>{ try{ updateSliderCircles(); setGradientFromInputs(); }catch(e){} }); });
+      const tiltChk = document.getElementById('useTilt');
+      if(tiltChk){ tiltChk.addEventListener('change', async ()=>{ try{ if(tiltChk.checked) await enableTiltTrue(); else enableTiltFalse(); setGradientFromInputs(); }catch(e){} }); }
       loadSavedGradient();
     })();
 
