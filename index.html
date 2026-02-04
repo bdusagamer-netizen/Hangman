@@ -11,6 +11,8 @@
       --glass-border: rgba(255,255,255,0.12);
     }
     body { font-family: Arial, sans-serif; text-align: center; margin:0; background: linear-gradient(180deg,var(--navy),var(--indigo),var(--purple)); color: #fff; min-height:100vh; }
+    /* Smooth rotation when tilt control rotates the page */
+    body.tilt-rotating { transition: transform 300ms ease; transform-origin: 50% 50%; }
     h1{margin:18px 0;color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.6);}
     #word { font-size: 2em; letter-spacing: 10px; margin-top: 20px; color: #e8e8ff; white-space: pre-wrap; }
     #wrong { color: #ffb3b3; margin-top: 12px; }
@@ -552,6 +554,21 @@
         const angleEl = document.getElementById('bgAngle');
         const angleVal = document.getElementById('bgAngleVal');
         if(angleEl){ angleEl.value = String(angle); if(angleVal) angleVal.textContent = String(angle); setGradientFromInputs(); }
+        // rotate entire page when device tilted strongly left/right
+        try{
+          const threshold = 30; // degrees of gamma to trigger rotation
+          let rot = 0;
+          if(g > threshold) rot = 90;
+          else if(g < -threshold) rot = -90;
+          if(typeof handleDeviceOrientation.lastRot === 'undefined') handleDeviceOrientation.lastRot = 0;
+          if(rot !== handleDeviceOrientation.lastRot){
+            handleDeviceOrientation.lastRot = rot;
+            document.body.classList.add('tilt-rotating');
+            document.body.style.transform = rot ? `rotate(${rot}deg)` : '';
+            // remove class after transition completes
+            setTimeout(()=>{ try{ document.body.classList.remove('tilt-rotating'); }catch(e){} }, 350);
+          }
+        }catch(e){}
       }catch(e){}
     }
     async function enableTiltTrue(){
@@ -1397,7 +1414,15 @@
       // award Hangman win points for each beaten level
       try{ addPoints(500); }catch(e){}
       // advance level
-      if(stickmanLevel < STICKMAN_TOTAL_LEVELS -1){ stickmanLevel++; startStickmanLevel(stickmanLevel); } else { alert('All Stickman Hook levels completed!'); stopStickman(); const ov=document.getElementById('stickmanOverlay'); if(ov) ov.remove(); }
+      if(stickmanLevel < STICKMAN_TOTAL_LEVELS -1){
+        stickmanLevel++; startStickmanLevel(stickmanLevel);
+      } else {
+        // All levels completed — congratulate but keep the overlay open so the player can replay
+        try{ alert('All Stickman Hook levels completed! You can replay levels from the menu.'); }catch(e){}
+        // Restart at first level to allow continued play
+        stickmanLevel = 0;
+        startStickmanLevel(stickmanLevel);
+      }
       renderMinigamesList();
     }
 
