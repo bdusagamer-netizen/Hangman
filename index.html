@@ -595,8 +595,8 @@
         if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
           try{
             const perm = await DeviceOrientationEvent.requestPermission();
-            if(perm !== 'granted'){ alert('Permission for device motion not granted.'); document.getElementById('useTilt').checked = false; return; }
-          }catch(e){ alert('Device motion permission denied.'); document.getElementById('useTilt').checked = false; return; }
+            if(perm !== 'granted'){ console.warn('Permission for device motion not granted.'); /* do not uncheck the UI; user may enable later */ }
+          }catch(e){ console.warn('Device motion permission denied or request failed.'); }
         }
       }catch(e){}
       window.addEventListener('deviceorientation', handleDeviceOrientation, true);
@@ -678,11 +678,8 @@
       const tiltChk = document.getElementById('useTilt');
       if(tiltChk){ tiltChk.addEventListener('change', async ()=>{ try{ if(tiltChk.checked) await enableTiltTrue(); else enableTiltFalse(); }catch(e){} }); }
       loadSavedGradient();
-      // Auto-enable tilt if checkbox is present and checked (default on)
-      try{
-        const chk = document.getElementById('useTilt');
-        if(chk && chk.checked){ enableTiltTrue().catch(()=>{}); }
-      }catch(e){}
+      // Sync initial rotation to current screen orientation (do not auto-request motion permission)
+      try{ syncRotationToScreenOrientation(); }catch(e){}
     })();
 
     // Reveal Minigames UI (adds a button next to Sets and Shop)
@@ -1466,9 +1463,7 @@
       if(stickmanLevel < STICKMAN_TOTAL_LEVELS -1){
         stickmanLevel++; startStickmanLevel(stickmanLevel);
       } else {
-        // All levels completed — congratulate but keep the overlay open so the player can replay
-        try{ alert('All Stickman Hook levels completed! You can replay levels from the menu.'); }catch(e){}
-        // Restart at first level to allow continued play
+        // All levels completed — restart from level 0 to allow continued play
         stickmanLevel = 0;
         startStickmanLevel(stickmanLevel);
       }
