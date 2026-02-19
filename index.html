@@ -176,9 +176,6 @@
   <button id="newRoundBtn" style="display:none;" onclick="resetGame()">New Round</button>
   <div id="letters"></div>
 
-  <!-- Persistent Symbols launcher (always visible) -->
-  <button id="openSymbolsBtn" style="position:fixed;left:12px;bottom:12px;z-index:9999;">Symbols</button>
-
   <script>
     const settingsBtn=document.getElementById("settingsBtn"),settingsPanel=document.getElementById("settingsPanel");
     settingsBtn.onclick = () => {
@@ -598,8 +595,8 @@
         if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
           try{
             const perm = await DeviceOrientationEvent.requestPermission();
-            if(perm !== 'granted'){ console.warn('Permission for device motion not granted.'); /* do not uncheck the UI; user may enable later */ }
-          }catch(e){ console.warn('Device motion permission denied or request failed.'); }
+            if(perm !== 'granted'){ alert('Permission for device motion not granted.'); document.getElementById('useTilt').checked = false; return; }
+          }catch(e){ alert('Device motion permission denied.'); document.getElementById('useTilt').checked = false; return; }
         }
       }catch(e){}
       window.addEventListener('deviceorientation', handleDeviceOrientation, true);
@@ -681,8 +678,11 @@
       const tiltChk = document.getElementById('useTilt');
       if(tiltChk){ tiltChk.addEventListener('change', async ()=>{ try{ if(tiltChk.checked) await enableTiltTrue(); else enableTiltFalse(); }catch(e){} }); }
       loadSavedGradient();
-      // Sync initial rotation to current screen orientation (do not auto-request motion permission)
-      try{ syncRotationToScreenOrientation(); }catch(e){}
+      // Auto-enable tilt if checkbox is present and checked (default on)
+      try{
+        const chk = document.getElementById('useTilt');
+        if(chk && chk.checked){ enableTiltTrue().catch(()=>{}); }
+      }catch(e){}
     })();
 
     // Reveal Minigames UI (adds a button next to Sets and Shop)
@@ -1076,25 +1076,38 @@
       updateShopDisplay();
     }
 
-    // Load dictionary from external JSON file (words.txt) and populate words
-    let dictionary = {};
-    let words = [];
-    async function loadDictionary(){
-      try{
-        const resp = await fetch('words.txt');
-        if(!resp.ok) throw new Error('Failed to load words.txt: ' + resp.status);
-        const data = await resp.json();
-        dictionary = data || {};
-        words = Object.values(dictionary).flat();
-      }catch(err){
-        console.error('Failed to load words.txt', err);
-        dictionary = {};
-        words = [];
-      }
-    }
+    const dictionary = {
+      "A": ["Apple","Ant","Arrow","Artist","Anchor","Airplane","Almond","Axe","Apricot","Atlas","Astral"],
+      "B": ["Ball","Butterscotch","Book","Bridge","Bottle","Bread","Bee","Brick","Brush","Button","Basket","Black"],
+      "C": ["Cat","Car","Cloud","Chair","Clock","Cup","Candle","Castle","Coin","Camera","Cake","Chaos"],
+      "D": ["Dog","Door","Drum","Desk","Duck","Diamond","Dish","Doll","Dress","Dragon"],
+      "E": ["Egg","Ear","Earth","Engine","Elbow","Envelope","Eye","Echo","Emerald","Elephant"],
+      "F": ["Fish","Fan","Fork","Fire","Feather","Fence","Fruit","Flag","Flower","Forest","Fart"],
+      "G": ["Goat","Game","Glass","Glove","Gate","Gift","Gold","Guitar","Garden","Grain"],
+      "H": ["Hat","hellodoulikemygameitsfunrightokbye","Hand","Horse","House","Hill","Hammer","Heart","Honey","Helmet","Harbor"],
+      "I": ["Ice","Ink","Iron","Island","Idea","Ivory","Insect","Item","Image","Input"],
+      "J": ["Jar","Jam","Jet","Jewel","Juice","Jacket","Jungle","Judge","Journey","Jump"],
+      "K": ["Key","King","Kite","Knife","Kid","Koala","Kernel","Knee","Knob","Kitten"],
+      "L": ["Lamp","Leaf","Lion","Lake","Lock","Ladder","Line","Lemon","Log","Lunch"],
+      "M": ["Moon","Map","Milk","Mouse","Man","Mirror","Mask","Magnet","Market","Mountain"],
+      "N": ["Net","Nail","Nest","Nose","Nut","Name","Note","Neck","Night","Number"],
+      "O": ["Owl","Oil","Orange","Ocean","Onion","Opera","Orbit","Olive","Opal","Octopus"],
+      "P": ["Pen","Pig","Pot","Pan","Pear","Plane","Park","Pipe","Plate","Pumpkin"],
+      "Q": ["Queen","Quill","Quest","Quartz","Quick","Quiet","Quote","Quilt","Quail","Queue"],
+      "R": ["Rat","Ring","Road","Rock","Rose","Roof","River","Rope","Radio","Robot"],
+      "S": ["Sun","Sand","Star","Ship","Sock","Stone","Salt","Seed","Shell","Sword","SIXSEVEN"],
+      "T": ["Tree","Toy","Table","Train","Truck","Tube","Tent","Tile","Tiger","Tool"],
+      "U": ["Umbrella","Urn","Uniform","Unicorn","Unit","User","Utensil","Uphill","Update","Utility"],
+      "V": ["Van","Vase","Veil","Vest","Vote","Valve","Vision","Village","Violin","Volcano"],
+      "W": ["Wall","Water","Wheel","Wing","Wolf","Wood","Wire","Wind","Watch","Window"],
+      "X": ["Xylophone","Xenon","Xerox","Xylem","Xenial","Xiphoid","Xenolith","Xenophobia","Xenogenesis","X-factor"],
+      "Y": ["Yak","Yarn","Yard","Year","Yellow","Yolk","Youth","Yield","Yawn","Yoga"],
+      "Z": ["Zoo","Zebra","Zero","Zone","Zip","Zinc","Zest","Zodiac","Zephyr","Zombie"]
+    };
 
-    function pickWord(){ if(words.length === 0){ return "SIXSEVEN"; } if(Math.random()<0.001){return "SIXSEVEN";} return words[Math.floor(Math.random()*words.length)]; }
-    function useOriginalSet(){ words = Object.values(dictionary).flat(); resetGame(); }
+    let words=Object.values(dictionary).flat();
+    function pickWord(){ if(Math.random()<0.001){return "SIXSEVEN";} return words[Math.floor(Math.random()*words.length)]; }
+    function useOriginalSet(){words=Object.values(dictionary).flat();resetGame();}
     function useCustomSet(n){
       const textarea=document.getElementById("custom"+n);
       const txt = textarea.value.trim();
@@ -1118,8 +1131,7 @@
     let adminUnlockConsumed = false;
     const shiftMap = {
       '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')',
-      '-':'_',"'":'"',',':'<','.':'>','/':'?',';':':','\\':'|','`':'~','=':'+',
-      '[':'{',']':'}'
+      '-':'_',"'":'"',',':'<','.':'>','/':'?',';':':','\\':'|','`':'~','=':'+'
     };
     const wordDiv=document.getElementById("word"),wrongDiv=document.getElementById("wrong"),messageDiv=document.getElementById("message"),lettersDiv=document.getElementById("letters"),ctx=document.getElementById("hangman").getContext("2d");
     ctx.lineWidth=3;
@@ -1199,11 +1211,9 @@
 
     function createButtons(){
       lettersDiv.innerHTML = "";
-      // extra symbols not normally shown on base keyboard
-      const extraSymbols = ['[',']','{','}','|','\\','/','<','>'];
       // keyboard rows: numbers + punctuation, top row letters, middle row, bottom row with shift
       const keys = [
-        ['1','2','3','4','5','6','7','8','9','0','-','=', '[', ']', '\\', '`', "'",";",',','.','/'],
+        ['1','2','3','4','5','6','7','8','9','0','-','`','=',"'",";",',','.','/'],
         'qwertyuiop'.split(''),
         'asdfghjkl'.split(''),
         'zxcvbnm'.split('')
@@ -1243,64 +1253,8 @@
       shiftBtn.textContent = 'Shift';
       shiftBtn.addEventListener('click', ()=>{ shiftActive = !shiftActive; shiftBtn.classList.toggle('active', shiftActive); });
       bottom.appendChild(shiftBtn);
-      // (symbols launcher moved to persistent `openSymbolsBtn` at bottom-left)
       lettersDiv.appendChild(bottom);
     }
-
-    // Insert a symbol (used by Symbols overlay). Handles updating guessed/wrong and UI.
-    function guessSymbol(ch){
-      if(!ch) return;
-      const normalized = /[a-z]/i.test(ch) ? ch.toLowerCase() : ch;
-      const wordLower = chosenWord.toLowerCase();
-      // find a matching on-screen button to disable if present
-      let btn = Array.from(document.querySelectorAll('#letters button')).find(b => {
-        if(!b.dataset) return false;
-        return (b.dataset.base === ch) || (b.dataset.shift === ch) || (b.textContent === ch) || (b.textContent.toLowerCase() === (ch+"").toLowerCase());
-      });
-      if(wordLower.includes((normalized+"").toLowerCase())){
-        if(!guessed.includes(normalized)) guessed.push(normalized);
-      } else {
-        if(!wrong.includes(normalized)){
-          wrong.push(normalized);
-          // draw step
-          try{ drawSteps[wrong.length-1](); }catch(e){}
-        }
-      }
-      if(btn) btn.disabled = true;
-      if(shiftActive){ shiftActive = false; const s=document.getElementById('shiftBtn'); if(s) s.classList.remove('active'); }
-      displayWord(); displayWrong(); checkGame();
-    }
-
-    function showSymbolsOverlay(list){
-      if(document.getElementById('symbolsOverlay')) return;
-      const ov = document.createElement('div'); ov.id = 'symbolsOverlay'; Object.assign(ov.style,{position:'fixed',left:0,top:0,width:'100%',height:'100%',background:'rgba(0,0,0,0.7)',zIndex:100000,display:'flex',alignItems:'center',justifyContent:'center'});
-      const box = document.createElement('div'); Object.assign(box.style,{background:'#0d1220',padding:'12px',borderRadius:'8px',minWidth:'320px',maxWidth:'92%',color:'#fff',boxShadow:'0 8px 40px rgba(0,0,0,0.6)',maxHeight:'80vh',overflowY:'auto'});
-      const hdr = document.createElement('div'); hdr.textContent = 'Symbols'; hdr.style.fontSize='18px'; hdr.style.marginBottom='8px'; box.appendChild(hdr);
-      const grid = document.createElement('div'); grid.style.display='grid'; grid.style.gridTemplateColumns='repeat(auto-fill,48px)'; grid.style.gap='8px'; grid.style.justifyContent='center';
-      // symbols that are not normally typed directly on standard keyboards (include ligatures, inverted punctuation, Greek letters)
-      const greekLower = ['α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω'];
-      const greekUpper = ['Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω'];
-      const ligatures = ['œ','æ','ie','ee'];
-      const special = ['¿','¡','‽'];
-      const basePick = list && Array.isArray(list) ? list.slice() : ['{','}','|','<','>','~','^',':','"','`'];
-      const all = [].concat(basePick, ['\\','/','[',']'], ligatures, special, greekLower, greekUpper);
-      all.forEach(s => {
-        const b = document.createElement('button'); b.textContent = s; b.style.width='44px'; b.style.height='44px'; b.style.padding='0'; b.addEventListener('click', ()=>{ guessSymbol(s); hideSymbolsOverlay(); });
-        grid.appendChild(b);
-      });
-      box.appendChild(grid);
-      const close = document.createElement('div'); close.style.marginTop='12px'; const closeBtn = document.createElement('button'); closeBtn.textContent='Close'; closeBtn.addEventListener('click', hideSymbolsOverlay); close.appendChild(closeBtn); box.appendChild(close);
-      ov.appendChild(box); document.body.appendChild(ov);
-      // clicking outside the box closes the overlay
-      ov.addEventListener('click', (e)=>{ if(e.target === ov) hideSymbolsOverlay(); });
-      // Escape key closes overlay
-      const escHandler = function(e){ if(e.key === 'Escape'){ hideSymbolsOverlay(); } };
-      document.addEventListener('keydown', escHandler);
-      // keep reference so hide can remove handler
-      ov._escHandler = escHandler;
-    }
-
-    function hideSymbolsOverlay(){ const ov=document.getElementById('symbolsOverlay'); if(ov){ try{ if(ov._escHandler) document.removeEventListener('keydown', ov._escHandler); }catch(e){} ov.remove(); } }
 
     function resetCanvas(){ctx.clearRect(0,0,300,300);}
     function resetGame(){
@@ -1316,39 +1270,6 @@
       shiftActive = false; const sb=document.getElementById('shiftBtn'); if(sb) sb.classList.remove('active');
       document.getElementById("newRoundBtn").style.display = "none";   
   }
-
-  // Wire persistent Symbols button to open picker
-  try{
-    const symLauncher = document.getElementById('openSymbolsBtn');
-    if(symLauncher){ symLauncher.addEventListener('click', ()=>{ showSymbolsOverlay(); }); }
-  }catch(e){}
-
-  // Physical keyboard support for symbols and letters: route single-character keys into the same handlers
-  document.addEventListener('keydown', (e)=>{
-    try{
-      const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-      if(tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey) return; // ignore typing in inputs or with modifiers
-      const k = e.key;
-      if(!k || typeof k !== 'string') return;
-      if(k.length === 1){
-        // find a matching on-screen button
-        const btn = Array.from(document.querySelectorAll('#letters button')).find(b => {
-          if(!b.dataset) return false;
-          return b.dataset.base === k || b.dataset.shift === k || b.textContent === k || b.textContent.toLowerCase() === k.toLowerCase();
-        });
-        if(btn && !btn.disabled){
-          // simulate click
-          const ev = new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: e.shiftKey });
-          btn.dispatchEvent(ev);
-          e.preventDefault();
-          return;
-        }
-        // fallback: route into symbol handler
-        guessSymbol(k);
-        e.preventDefault();
-      }
-    }catch(err){ }
-  }, false);
     
     // --- Stickman Hook mini-game (simplified)
     let stickmanCanvas = null, stickmanCtx = null, stickmanRunning = false;
@@ -1545,7 +1466,9 @@
       if(stickmanLevel < STICKMAN_TOTAL_LEVELS -1){
         stickmanLevel++; startStickmanLevel(stickmanLevel);
       } else {
-        // All levels completed — restart from level 0 to allow continued play
+        // All levels completed — congratulate but keep the overlay open so the player can replay
+        try{ alert('All Stickman Hook levels completed! You can replay levels from the menu.'); }catch(e){}
+        // Restart at first level to allow continued play
         stickmanLevel = 0;
         startStickmanLevel(stickmanLevel);
       }
@@ -1762,8 +1685,9 @@
       if(ud && udv){ ud.addEventListener('input', ()=> udv.textContent = ud.value); }
     })();
 
-    // Start the game after dictionary loads
-    loadDictionary().then(()=>{ resetGame(); loadGame(); }).catch((e)=>{ console.error('loadDictionary failed', e); resetGame(); loadGame(); });
+    // Start the game
+    resetGame();
+    loadGame();
   </script>
 </body>
 </html>
