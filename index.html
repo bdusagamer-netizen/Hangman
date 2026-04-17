@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html  lang="en">
+<html lang="en">
 <head>
   <title>Hangman Game</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root{
       --navy:#001f3f;
@@ -82,6 +83,8 @@
       opacity: 0;
     }
   </style>
+<script src="https://jquery.com" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
   <h1>Hangman</h1>
@@ -175,7 +178,6 @@
   <div id="message"></div>
   <button id="newRoundBtn" style="display:none;" onclick="resetGame()">New Round</button>
   <div id="letters"></div>
-
   <script>
     const settingsBtn=document.getElementById("settingsBtn"),settingsPanel=document.getElementById("settingsPanel");
     settingsBtn.onclick = () => {
@@ -1076,34 +1078,35 @@
       updateShopDisplay();
     }
 
-    const dictionary = {
-      "A": ["Apple","Ant","Arrow","Artist","Anchor","Airplane","Almond","Axe","Apricot","Atlas","Astral"],
-      "B": ["Ball","Butterscotch","Book","Bridge","Bottle","Bread","Bee","Brick","Brush","Button","Basket","Black"],
-      "C": ["Cat","Car","Cloud","Chair","Clock","Cup","Candle","Castle","Coin","Camera","Cake","Chaos"],
-      "D": ["Dog","Door","Drum","Desk","Duck","Diamond","Dish","Doll","Dress","Dragon"],
-      "E": ["Egg","Ear","Earth","Engine","Elbow","Envelope","Eye","Echo","Emerald","Elephant"],
-      "F": ["Fish","Fan","Fork","Fire","Feather","Fence","Fruit","Flag","Flower","Forest","Fart"],
-      "G": ["Goat","Game","Glass","Glove","Gate","Gift","Gold","Guitar","Garden","Grain"],
-      "H": ["Hat","hellodoulikemygameitsfunrightokbye","Hand","Horse","House","Hill","Hammer","Heart","Honey","Helmet","Harbor"],
-      "I": ["Ice","Ink","Iron","Island","Idea","Ivory","Insect","Item","Image","Input"],
-      "J": ["Jar","Jam","Jet","Jewel","Juice","Jacket","Jungle","Judge","Journey","Jump"],
-      "K": ["Key","King","Kite","Knife","Kid","Koala","Kernel","Knee","Knob","Kitten"],
-      "L": ["Lamp","Leaf","Lion","Lake","Lock","Ladder","Line","Lemon","Log","Lunch"],
-      "M": ["Moon","Map","Milk","Mouse","Man","Mirror","Mask","Magnet","Market","Mountain"],
-      "N": ["Net","Nail","Nest","Nose","Nut","Name","Note","Neck","Night","Number"],
-      "O": ["Owl","Oil","Orange","Ocean","Onion","Opera","Orbit","Olive","Opal","Octopus"],
-      "P": ["Pen","Pig","Pot","Pan","Pear","Plane","Park","Pipe","Plate","Pumpkin"],
-      "Q": ["Queen","Quill","Quest","Quartz","Quick","Quiet","Quote","Quilt","Quail","Queue"],
-      "R": ["Rat","Ring","Road","Rock","Rose","Roof","River","Rope","Radio","Robot"],
-      "S": ["Sun","Sand","Star","Ship","Sock","Stone","Salt","Seed","Shell","Sword","SIXSEVEN"],
-      "T": ["Tree","Toy","Table","Train","Truck","Tube","Tent","Tile","Tiger","Tool"],
-      "U": ["Umbrella","Urn","Uniform","Unicorn","Unit","User","Utensil","Uphill","Update","Utility"],
-      "V": ["Van","Vase","Veil","Vest","Vote","Valve","Vision","Village","Violin","Volcano"],
-      "W": ["Wall","Water","Wheel","Wing","Wolf","Wood","Wire","Wind","Watch","Window"],
-      "X": ["Xylophone","Xenon","Xerox","Xylem","Xenial","Xiphoid","Xenolith","Xenophobia","Xenogenesis","X-factor"],
-      "Y": ["Yak","Yarn","Yard","Year","Yellow","Yolk","Youth","Yield","Yawn","Yoga"],
-      "Z": ["Zoo","Zebra","Zero","Zone","Zip","Zinc","Zest","Zodiac","Zephyr","Zombie"]
-    };
+const dictionary = {
+  "A": ["Apple","Ant","Arrow","Artist","Anchor","Airplane","Almond","Axe","Apricot","Atlas","Astral","Arctic","Aura"],
+  "B": ["Ball","Butterscotch","Book","Bridge","Bottle","Bread","Bee","Brick","Brush","Button","Basket","Black","Breeze","Beacon"],
+  "C": ["Cat","Car","Cloud","Chair","Clock","Cup","Candle","Castle","Coin","Camera","Cake","Chaos","Canyon","Cedar"],
+  "D": ["Dog","Door","Drum","Desk","Duck","Diamond","Dish","Doll","Dress","Dragon","Dolphin","Dune"],
+  "E": ["Egg","Ear","Earth","Engine","Elbow","Envelope","Eye","Echo","Emerald","Elephant","Eagle","Ember"],
+  "F": ["Fish","Fan","Fork","Fire","Feather","Fence","Fruit","Flag","Flower","Forest","Fart","Frost","Fossil"],
+  "G": ["Goat","Game","Glass","Glove","Gate","Gift","Gold","Guitar","Garden","Grain","Glacier","Gully"],
+  "H": ["Hat","hellodoulikemygameitsfunrightokbye","Hand","Horse","House","Hill","Hammer","Heart","Honey","Helmet","Harbor","Haven","Hollow"],
+  "I": ["Ice","Ink","Iron","Island","Idea","Ivory","Insect","Item","Image","Input","Iris","Icon"],
+  "J": ["Jar","Jam","Jet","Jewel","Juice","Jacket","Jungle","Judge","Journey","Jump","Jolly","Jade"],
+  "K": ["Key","King","Kite","Knife","Kid","Koala","Kernel","Knee","Knob","Kitten","Kayak","Kelp"],
+  "L": ["Lamp","Leaf","Lion","Lake","Lock","Ladder","Line","Lemon","Log","Lunch","Lunar","Lyric"],
+  "M": ["Moon","Map","Milk","Mouse","Man","Mirror","Mask","Magnet","Market","Mountain","Mist","Mosaic"],
+  "N": ["Net","Nail","Nest","Nose","Nut","Name","Note","Neck","Night","Number","Nova","Nectar"],
+  "O": ["Owl","Oil","Orange","Ocean","Onion","Opera","Orbit","Olive","Opal","Octopus","Orchid","Oasis"],
+  "P": ["Pen","Pig","Pot","Pan","Pear","Plane","Park","Pipe","Plate","Pumpkin","Pulse","Pebble"],
+  "Q": ["Queen","Quill","Quest","Quartz","Quick","Quiet","Quote","Quilt","Quail","Queue","Quiver","Quake"],
+  "R": ["Rat","Ring","Road","Rock","Rose","Roof","River","Rope","Radio","Robot","Radar","Relic"],
+  "S": ["Sun","Sand","Star","Ship","Sock","Stone","Salt","Seed","Shell","Sword","Solar","Swift"],
+  "T": ["Tree","Toy","Table","Train","Truck","Tube","Tent","Tile","Tiger","Tool","Tidal","Terra"],
+  "U": ["Umbrella","Urn","Uniform","Unicorn","Unit","User","Utensil","Uphill","Update","Utility","Urban","Unity"],
+  "V": ["Van","Vase","Veil","Vest","Vote","Valve","Vision","Village","Violin","Volcano","Vivid","Vortex"],
+  "W": ["Wall","Water","Wheel","Wing","Wolf","Wood","Wire","Wind","Watch","Window","Wave","Willow"],
+  "X": ["Xylophone","Xenon","Xerox","Xylem","Xenial","Xiphoid","Xenolith","Xenophobia","Xenogenesis","X-factor","Xray","Xeric"],
+  "Y": ["Yak","Yarn","Yard","Year","Yellow","Yolk","Youth","Yield","Yawn","Yoga","Yonder","Yule"],
+  "Z": ["Zoo","Zebra","Zero","Zone","Zip","Zinc","Zest","Zodiac","Zephyr","Zombie","Zenith","Zigzag"]
+};
+
 
     let words=Object.values(dictionary).flat();
     function pickWord(){ if(Math.random()<0.001){return "SIXSEVEN";} return words[Math.floor(Math.random()*words.length)]; }
